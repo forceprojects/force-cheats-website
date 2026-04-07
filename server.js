@@ -197,10 +197,14 @@ const extractFirstUrl = (value) => {
 const serveFile = async (res, filePath) => {
   const ext = path.extname(filePath).toLowerCase();
   const contentType = MIME_TYPES[ext] || "application/octet-stream";
+  const cacheControl =
+    ext === ".html" || ext === ".js" || ext === ".css"
+      ? "no-store"
+      : "public, max-age=86400";
 
   const headers = {
     "Content-Type": contentType,
-    "Cache-Control": ext === ".html" ? "no-store" : "public, max-age=86400"
+    "Cache-Control": cacheControl
   };
 
   if (ext === ".html") {
