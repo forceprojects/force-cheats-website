@@ -1967,7 +1967,7 @@ const handleMoneyMotionCheckout = async (req, res) => {
   );
 };
 
-const server = http.createServer(async (req, res) => {
+const handleRequest = async (req, res) => {
   try {
     if (!req.url) {
       send(res, 400, { "Content-Type": "text/plain; charset=utf-8" }, "Bad Request");
@@ -2202,8 +2202,13 @@ const server = http.createServer(async (req, res) => {
   } catch {
     send(res, 500, { "Content-Type": "text/plain; charset=utf-8" }, "Internal Server Error");
   }
-});
+};
 
-server.listen(PORT, "::", () => {
-  process.stdout.write(`Server running on http://localhost:${PORT}\n`);
-});
+module.exports = { handleRequest };
+
+if (require.main === module) {
+  const server = http.createServer((req, res) => void handleRequest(req, res));
+  server.listen(PORT, "::", () => {
+    process.stdout.write(`Server running on http://localhost:${PORT}\n`);
+  });
+}

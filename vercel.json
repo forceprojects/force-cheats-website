@@ -1,26 +1,11 @@
 {
-  "cleanUrls": false,
-  "trailingSlash": false,
-  "builds": [
-    { "src": "package.json", "use": "@vercel/static-build", "config": { "distDir": "dist" } }
-  ],
-  "rewrites": [
-    { "source": "/", "destination": "/index.html" },
-
-    { "source": "/forum", "destination": "/forum.html" },
-    { "source": "/guides", "destination": "/guides.html" },
-    { "source": "/profile", "destination": "/profile.html" },
-    { "source": "/purchases", "destination": "/purchases.html" },
-    { "source": "/register", "destination": "/register.html" },
-    { "source": "/reviews", "destination": "/reviews.html" },
-    { "source": "/settings", "destination": "/settings.html" },
-    { "source": "/status", "destination": "/status.html" },
-    { "source": "/support", "destination": "/support.html" },
-    { "source": "/privacy-policy", "destination": "/privacy-policy.html" },
-    { "source": "/terms-of-service", "destination": "/terms-of-service.html" },
-    { "source": "/topic", "destination": "/topic.html" },
-    { "source": "/admin", "destination": "/admin.html" },
-    { "source": "/product", "destination": "/products/product.html" },
-    { "source": "/product.html", "destination": "/products/product.html" }
+  "version": 2,
+  "functions": {
+    "api/index.js": {
+      "includeFiles": "website/**"
+    }
+  },
+  "routes": [
+    { "src": "/(.*)", "dest": "/api/index.js" }
   ]
 }
