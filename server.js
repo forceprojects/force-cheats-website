@@ -218,6 +218,7 @@ const serveFile = async (res, filePath) => {
     const supportedLinks = buildSupportedCheatsFooterLinks(storeConfig);
     html = injectSupportedCheatsFooter(html, supportedLinks);
     html = injectCleanUrlsIntoHtml(html);
+    html = injectSupabaseSessionFromUrlIntoHtml(html);
     res.writeHead(200, headers);
     res.end(html);
     return;
@@ -903,6 +904,15 @@ const injectCleanUrlsIntoHtml = (html) => {
   const script = `<script id="kylo-clean-urls">(function(){function isSkippableHref(h){if(!h)return true;var s=String(h).trim();if(!s)return true;if(s[0]==="#")return true;var l=s.toLowerCase();return l.startsWith("mailto:")||l.startsWith("tel:")||l.startsWith("javascript:")||l.startsWith("data:")||l.startsWith("blob:")||l.startsWith("http://")||l.startsWith("https://");}function toClean(u){try{var url=new URL(u,window.location.href);if(url.origin!==window.location.origin)return null;var p=url.pathname||"/";if(/\\/index\\.html$/i.test(p))p=p.replace(/\\/index\\.html$/i,"/");else p=p.replace(/\\.html$/i,"");url.pathname=p;return url.pathname+url.search+url.hash;}catch(_){return null;}}function rewriteAll(){var links=document.querySelectorAll("a[href]");for(var i=0;i<links.length;i++){var a=links[i];var h=a.getAttribute("href");if(isSkippableHref(h))continue;var cleaned=toClean(h);if(cleaned&&cleaned!==h)a.setAttribute("href",cleaned);} }document.addEventListener("click",function(e){var t=e.target;var a=t&&t.closest?t.closest("a[href]"):null;if(!a)return;var h=a.getAttribute("href");if(isSkippableHref(h))return;var cleaned=toClean(h);if(!cleaned||cleaned===h)return;a.setAttribute("href",cleaned);});if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",rewriteAll);else rewriteAll();})();</script>`;
   if (html.includes('id="kylo-clean-urls"')) {
     return html.replace(/<script id="kylo-clean-urls">[\s\S]*?<\/script>/i, script);
+  }
+  if (/<\/body>/i.test(html)) return html.replace(/<\/body>/i, script + "</body>");
+  return html;
+};
+
+const injectSupabaseSessionFromUrlIntoHtml = (html) => {
+  const script = `<script id="kylo-supabase-session-from-url">(function(){function hasAuthInUrl(){try{var u=new URL(window.location.href);var h=u.hash&&u.hash[0]==="#"?u.hash.slice(1):u.hash;var hp=new URLSearchParams(h||"");if(hp.get("access_token")||hp.get("refresh_token")||hp.get("token")||hp.get("type"))return true;if(u.searchParams.get("code")||u.searchParams.get("token")||u.searchParams.get("type"))return true;return false;}catch(_){return false;}}function getSupabase(){return window.kyloSupabase||((window.__supabaseAuth&&window.__supabaseAuth.supabase)?window.__supabaseAuth.supabase:null)||null;}function cleanUrl(){try{var u=new URL(window.location.href);u.hash="";u.searchParams.delete("code");u.searchParams.delete("token");u.searchParams.delete("type");window.history.replaceState({},document.title,u.pathname+(u.search?u.search:""));}catch(_){}}function run(sb){try{if(!sb||!sb.auth)return;var u=new URL(window.location.href);var code=u.searchParams.get("code")||"";var auth=sb.auth;var p=null;if(typeof auth.getSessionFromUrl==="function"){p=auth.getSessionFromUrl({storeSession:true});}else if(code&&typeof auth.exchangeCodeForSession==="function"){p=auth.exchangeCodeForSession(code);}if(!p)return;Promise.resolve(p).then(function(){cleanUrl();}).catch(function(){cleanUrl();});}catch(_){}}if(!hasAuthInUrl())return;var tries=0;var max=120;var tick=function(){var sb=getSupabase();if(sb){run(sb);return;}tries++;if(tries<max)setTimeout(tick,50);};tick();})();</script>`;
+  if (html.includes('id="kylo-supabase-session-from-url"')) {
+    return html.replace(/<script id="kylo-supabase-session-from-url">[\s\S]*?<\/script>/i, script);
   }
   if (/<\/body>/i.test(html)) return html.replace(/<\/body>/i, script + "</body>");
   return html;
