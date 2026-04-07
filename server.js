@@ -222,6 +222,7 @@ const serveFile = async (res, filePath) => {
     const storeConfig = await getStoreConfigCached();
     const supportedLinks = buildSupportedCheatsFooterLinks(storeConfig);
     html = injectSupportedCheatsFooter(html, supportedLinks);
+    html = injectSupabaseBrowserClient(html);
     html = injectCleanUrlsIntoHtml(html);
     html = injectSupabaseSessionFromUrlIntoHtml(html);
     html = injectAuthUiFromLocalStorageIntoHtml(html);
@@ -913,6 +914,19 @@ const injectCleanUrlsIntoHtml = (html) => {
     return html.replace(/<script id="kylo-clean-urls">[\s\S]*?<\/script>/i, script);
   }
   if (/<\/body>/i.test(html)) return html.replace(/<\/body>/i, script + "</body>");
+  return html;
+};
+
+const injectSupabaseBrowserClient = (html) => {
+  const marker = 'id="kylo-supabase-browser-client"';
+  const scriptTag =
+    '<script id="kylo-supabase-browser-client" src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>';
+  if (html.includes(marker)) return html;
+  const supabaseAuthScriptRegex = /<script[^>]+src=(["'])supabase-auth\.js(?:\?[^"']*)?\1[^>]*><\/script>/i;
+  if (supabaseAuthScriptRegex.test(html)) {
+    return html.replace(supabaseAuthScriptRegex, `${scriptTag}$&`);
+  }
+  if (/<\/head>/i.test(html)) return html.replace(/<\/head>/i, scriptTag + "</head>");
   return html;
 };
 

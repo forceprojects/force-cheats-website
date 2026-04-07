@@ -1,11 +1,11 @@
-import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/+esm";
-
 const supabaseUrl = window.kyloSupabaseUrl || "";
 const supabaseAnonKey = window.kyloSupabaseAnonKey || "";
 
 const getSupabase = () => {
   if (window.kyloSupabase) return window.kyloSupabase;
   if (!supabaseUrl || !supabaseAnonKey) return null;
+  const createClient = window.supabase?.createClient;
+  if (typeof createClient !== "function") return null;
   return createClient(supabaseUrl, supabaseAnonKey, {
     auth: { persistSession: true, storage: window.localStorage },
   });

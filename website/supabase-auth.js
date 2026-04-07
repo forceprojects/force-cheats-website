@@ -1,14 +1,15 @@
-import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/+esm";
-
 const supabaseUrl = "https://tjpxmbfekgnxtyujvyvx.supabase.co";
 const supabaseAnonKey = "sb_publishable_MY0T9tn8TU567ZRsnoZHyA_gGqyVs2W";
 
 const canUseSupabase = () => Boolean(supabaseUrl && supabaseAnonKey);
 
-const createSupabase = (storage) =>
-  createClient(supabaseUrl, supabaseAnonKey, {
+const createSupabase = (storage) => {
+  const createClient = window.supabase?.createClient;
+  if (typeof createClient !== "function") return null;
+  return createClient(supabaseUrl, supabaseAnonKey, {
     auth: { persistSession: true, storage }
   });
+};
 
 const supabase = canUseSupabase() ? createSupabase(window.localStorage) : null;
 window.kyloSupabase = supabase;
@@ -598,7 +599,9 @@ if (desktopSignIn || mobileSignIn || menu) {
   bindMenuTriggers();
   bindHeaderLogin();
   initNotice();
-  await initAuthUi();
+  Promise.resolve(initAuthUi()).catch(() => {
+    setSignedOutUi();
+  });
 }
 
 window.__supabaseAuth = {
@@ -610,5 +613,3 @@ window.__supabaseAuth = {
 
 window.kyloSupabase = supabase;
 window.kyloCanUseSupabase = canUseSupabase;
-
-export { supabase, canUseSupabase, setSignedInUi, setSignedOutUi };
