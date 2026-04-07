@@ -226,6 +226,105 @@ const showList = (html) => {
   els.list?.classList.remove("ipsHide");
 };
 
+const withTimeout = async (promise, ms, label) => {
+  let timer = null;
+  try {
+    const timeout = new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(label || "Request timed out")), Math.max(1, Number(ms) || 1));
+    });
+    return await Promise.race([promise, timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+};
+
+const readUserFromLocalSession = () => {
+  try {
+    const knownKey = supabaseUrl
+      ? `sb-${String(supabaseUrl).replace(/^https?:\/\//i, "").split(".")[0]}-auth-token`
+      : "";
+    const keys = [];
+    if (knownKey) keys.push(knownKey);
+    for (let i = 0; i < window.localStorage.length; i += 1) {
+      const k = String(window.localStorage.key(i) || "");
+      if (/^sb-[a-z0-9]+-auth-token$/i.test(k) && !keys.includes(k)) keys.push(k);
+    }
+    for (const key of keys) {
+      const raw = window.localStorage.getItem(key);
+      if (!raw) continue;
+      const data = JSON.parse(raw);
+      const session = data?.currentSession || data?.session || data;
+      const user = session?.user || data?.user || null;
+      if (user?.id || user?.email) return user;
+    }
+  } catch (_) {}
+  return null;
+};
+
+const getAuthenticatedUser = async (supabase) => {
+  const userResult = await withTimeout(supabase.auth.getUser(), 15000, "Timed out while checking sign-in status");
+  const directUser = userResult?.data?.user || null;
+  if (directUser) return directUser;
+
+  try {
+    const sessionResult = await withTimeout(supabase.auth.getSession(), 10000, "Timed out while reading session");
+    const sessionUser = sessionResult?.data?.session?.user || null;
+    if (sessionUser) return sessionUser;
+  } catch (_) {}
+
+  return readUserFromLocalSession();
+};
+
+const uniqueById = (rows) => {
+  const map = new Map();
+  (Array.isArray(rows) ? rows : []).forEach((row) => {
+    const id = String(row?.id || "").trim();
+    if (!id) return;
+    if (!map.has(id)) map.set(id, row);
+  });
+  return Array.from(map.values());
+};
+
+const fetchPurchasesRows = async (supabase, user) => {
+  const baseSelect =
+    "id, user_id, purchaser_email, shopify_order_id, order_name, financial_status, currency, total_price, created_at, processed_at, line_items, license_keys, raw, payment_provider, provider_checkout_session_id";
+  const byIdPromise = supabase
+    .from("purchases")
+    .select(baseSelect)
+    .eq("user_id", user.id)
+    .order("processed_at", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  const email = String(user?.email || "").trim().toLowerCase();
+  const byEmailPromise = email
+    ? supabase
+        .from("purchases")
+        .select(baseSelect)
+        .eq("purchaser_email", email)
+        .order("processed_at", { ascending: false })
+        .order("created_at", { ascending: false })
+        .limit(100)
+    : Promise.resolve({ data: [], error: null });
+
+  const [byId, byEmail] = await withTimeout(
+    Promise.all([byIdPromise, byEmailPromise]),
+    20000,
+    "Timed out while loading purchases"
+  );
+
+  const firstError = byId?.error || byEmail?.error || null;
+  if (firstError) return { data: null, error: firstError };
+
+  const merged = uniqueById([...(Array.isArray(byId?.data) ? byId.data : []), ...(Array.isArray(byEmail?.data) ? byEmail.data : [])]);
+  merged.sort((a, b) => {
+    const ad = new Date(a?.processed_at || a?.created_at || 0).getTime();
+    const bd = new Date(b?.processed_at || b?.created_at || 0).getTime();
+    return bd - ad;
+  });
+  return { data: merged, error: null };
+};
+
 const formatDateTime = (iso) => {
   if (!iso) return "";
   const d = new Date(iso);
@@ -733,18 +832,21 @@ const ensureCustomerRole = async (supabase, user, { currentUsername, currentDisp
 const main = async () => {
   ensurePurchasesStyles();
   showLoading();
-  const supabase = getSupabase();
-  if (!supabase) {
-    showEmpty("Purchases unavailable", "Supabase is not configured on this page.");
-    return;
-  }
+  const loadingGuard = setTimeout(() => {
+    showEmpty("Still loading purchases", "Refresh the page. If it persists, sign out and sign in again.");
+  }, 25000);
+  try {
+    const supabase = getSupabase();
+    if (!supabase) {
+      showEmpty("Purchases unavailable", "Supabase is not configured on this page.");
+      return;
+    }
 
-  const { data: userData } = await supabase.auth.getUser();
-  const user = userData?.user || null;
-  if (!user) {
-    showEmpty("Sign in required", "Please sign in to view your purchases.");
-    return;
-  }
+    const user = await getAuthenticatedUser(supabase);
+    if (!user) {
+      showEmpty("Sign in required", "Please sign in to view your purchases.");
+      return;
+    }
 
   let currentUsername = normalizeUsername(user?.user_metadata?.username || user?.user_metadata?.user_name || "");
   let currentDisplayName = String(user?.user_metadata?.full_name || "").trim();
@@ -756,13 +858,7 @@ const main = async () => {
   if (!currentUsername) currentUsername = normalizeUsername(String(user.email || "").split("@")[0] || "") || "account";
   if (!currentDisplayName) currentDisplayName = currentUsername;
 
-  const { data, error } = await supabase
-    .from("purchases")
-    .select("id, user_id, purchaser_email, shopify_order_id, order_name, financial_status, currency, total_price, created_at, processed_at, line_items, license_keys, raw, payment_provider, provider_checkout_session_id")
-    .or(`user_id.eq.${user.id},purchaser_email.eq.${String(user.email || "").toLowerCase()}`)
-    .order("processed_at", { ascending: false })
-    .order("created_at", { ascending: false })
-    .limit(100);
+    const { data, error } = await fetchPurchasesRows(supabase, user);
 
   if (error) {
     if (isMissingTableError(error)) {
@@ -947,6 +1043,15 @@ const main = async () => {
       } catch (_) {}
     });
   });
+  } catch (error) {
+    const detail = String(error?.message || "").trim();
+    showEmpty("Failed to load purchases", detail || "Please try again later.");
+  } finally {
+    clearTimeout(loadingGuard);
+  }
 };
 
-main();
+main().catch((error) => {
+  const detail = String(error?.message || "").trim();
+  showEmpty("Failed to load purchases", detail || "Please try again later.");
+});
