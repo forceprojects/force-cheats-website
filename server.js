@@ -217,6 +217,7 @@ const serveFile = async (res, filePath) => {
     const storeConfig = await getStoreConfigCached();
     const supportedLinks = buildSupportedCheatsFooterLinks(storeConfig);
     html = injectSupportedCheatsFooter(html, supportedLinks);
+    html = injectCleanUrlsIntoHtml(html);
     res.writeHead(200, headers);
     res.end(html);
     return;
@@ -896,6 +897,15 @@ const injectSupportedCheatsFooter = (html, linksHtml) => {
   const re = /(<h2[^>]*class=["']cFooterLinks_title["'][^>]*>\s*Supported Cheats\s*<\/h2>\s*)<div[^>]*class=["']cFooterLinks["'][^>]*>[\s\S]*?<\/div>/gi;
   if (!re.test(html)) return html;
   return html.replace(re, (_m, h2) => `${h2}${linksHtml}`);
+};
+
+const injectCleanUrlsIntoHtml = (html) => {
+  const script = `<script id="kylo-clean-urls">(function(){function isSkippableHref(h){if(!h)return true;var s=String(h).trim();if(!s)return true;if(s[0]==="#")return true;var l=s.toLowerCase();return l.startsWith("mailto:")||l.startsWith("tel:")||l.startsWith("javascript:")||l.startsWith("data:")||l.startsWith("blob:")||l.startsWith("http://")||l.startsWith("https://");}function toClean(u){try{var url=new URL(u,window.location.href);if(url.origin!==window.location.origin)return null;var p=url.pathname||"/";if(/\\/index\\.html$/i.test(p))p=p.replace(/\\/index\\.html$/i,"/");else p=p.replace(/\\.html$/i,"");url.pathname=p;return url.pathname+url.search+url.hash;}catch(_){return null;}}function rewriteAll(){var links=document.querySelectorAll("a[href]");for(var i=0;i<links.length;i++){var a=links[i];var h=a.getAttribute("href");if(isSkippableHref(h))continue;var cleaned=toClean(h);if(cleaned&&cleaned!==h)a.setAttribute("href",cleaned);} }document.addEventListener("click",function(e){var t=e.target;var a=t&&t.closest?t.closest("a[href]"):null;if(!a)return;var h=a.getAttribute("href");if(isSkippableHref(h))return;var cleaned=toClean(h);if(!cleaned||cleaned===h)return;a.setAttribute("href",cleaned);});if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",rewriteAll);else rewriteAll();})();</script>`;
+  if (html.includes('id="kylo-clean-urls"')) {
+    return html.replace(/<script id="kylo-clean-urls">[\s\S]*?<\/script>/i, script);
+  }
+  if (/<\/body>/i.test(html)) return html.replace(/<\/body>/i, script + "</body>");
+  return html;
 };
 
 const DEFAULT_NOTIFICATIONS_CONFIG = {
