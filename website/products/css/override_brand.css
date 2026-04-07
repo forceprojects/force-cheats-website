@@ -1,0 +1,235 @@
+:root {
+  --theme-brand_primary: 29, 104, 215;
+  --theme-brand_secondary: 29, 104, 215;
+  --theme-brand_accent_hex: #1d68d7;
+  --theme-brand_gradient: linear-gradient(60deg, #ffffff, #1d68d7);
+  --theme-brand_gradient_webkit: linear-gradient(60deg, #ffffff, #1d68d7);
+}
+.gradient-text {
+  background: var(--theme-brand_gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent !important;
+}
+/* Footer links hover effect */
+#elFooterLinks li a:hover {
+  color: var(--theme-brand_accent_hex) !important;
+}
+
+.copyright:hover {
+  color: var(--theme-brand_accent_hex) !important;
+}
+
+/* All links hover - Blue instead of green */
+a:hover,
+a:focus,
+.seo_feature_content a:hover,
+.seo_feature_content p a:hover,
+.ipsType_normal a:hover,
+.ipsContained a:hover,
+.ipsType_richText a:hover,
+.ipsType_medium a:hover,
+article a:hover,
+p a:hover {
+  color: var(--theme-brand_accent_hex) !important;
+}
+
+.cDiscord a,
+.cDiscord a:hover,
+.cDiscord a:focus,
+a.cShareLink_discord,
+a.cShareLink_discord:hover,
+a.cShareLink_discord:focus {
+  color: #fff !important;
+}
+
+/* Quantity manager glow effect - blue */
+.quantity_manager {
+  border-color: #35383d !important;
+
+}
+
+.quantity_manager:hover, .quantity_manager:focus {
+  border-color: var(--theme-brand_accent_hex) !important;
+  box-shadow: 0 0 15px rgba(29, 104, 215, 0.5) !important;
+}
+
+/* Blue form fields instead of green */
+input[type="email"]:focus,
+input[type="password"]:focus,
+input[type="text"]:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--theme-brand_accent_hex) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 3px rgba(29, 104, 215, 0.25) !important;
+}
+
+/* Blue checkbox instead of green */
+input[type="checkbox"]:focus {
+  border-color: var(--theme-brand_accent_hex) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 3px rgba(29, 104, 215, 0.6) !important;
+}
+
+input[type="checkbox"]:checked {
+  background-color: var(--theme-brand_accent_hex) !important;
+  border-color: var(--theme-brand_accent_hex) !important;
+}
+
+/* Custom checkbox styling for Remember me */
+.ipsCustomInput input[type="checkbox"]:focus + span,
+#remember_me_checkbox:focus + span {
+  border-color: var(--theme-brand_accent_hex) !important;
+  box-shadow: 0 0 0 3px rgba(29, 104, 215, 0.6) !important;
+}
+
+.ipsCustomInput input[type="checkbox"]:checked + span,
+#remember_me_checkbox:checked + span {
+  background-color: var(--theme-brand_accent_hex) !important;
+  border-color: var(--theme-brand_accent_hex) !important;
+}
+
+.ipsCustomInput input[type="checkbox"]:checked + span:before,
+#remember_me_checkbox:checked + span:before {
+  border-color: #fff !important;
+}
+
+/* Hero banner background */
+.theme-header__hero{
+  position: relative;
+  overflow: hidden;
+  background: transparent;
+}
+
+.theme-header__hero .heroBannerImg{
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  z-index: 0;
+}
+
+.theme-header__hero .ipsLayout_container{
+  position: relative;
+  z-index: 1;
+}
+
+/* Product feature arrow/icon color overrides */
+.ccNexusPackage li > i[class*="fa-"],
+.seo_features li > i[class*="fa-"],
+.seo_columns li > i[class*="fa-"],
+.requirements_section ul li i,
+.corefeatures_section ul li i,
+.box ul li i {
+  color: var(--theme-brand_accent_hex) !important;
+}
+
+.ipsNavBar_primary > ul > li > a:hover,
+.ipsNavBar_primary > ul > li > a:focus,
+.ipsNavBar_primary > ul > li > a:active {
+  color: #fff !important;
+}
+
+.onlineIcon {
+  background-image: linear-gradient(to right, #9dff88, #9dff88, #9dff88) !important;
+  color: #9dff88 !important;
+}
+
+.cOnlineUsers_co > span:first-child {
+  color: #9dff88 !important;
+}
+
+.authModal {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.authModal:not(.ipsHide) {
+  display: flex;
+}
+.authModal_backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+}
+.authModal_dialog {
+  position: relative;
+  width: 360px;
+  max-width: 90vw;
+  background: #1f2330;
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+  color: #d3d7e3;
+}
+.authModal_header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.authModal_title {
+  font-size: 18px;
+  font-weight: 600;
+}
+.authModal_close {
+  background: transparent;
+  border: 0;
+  color: #a6adc6;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+.authModal_body {
+  padding: 18px;
+}
+.ipsField_fullWidth {
+  width: 100%;
+  box-sizing: border-box;
+}
+.authFieldRow {
+  margin-bottom: 5px !important;
+}
+.cUserNav_signIn > a {
+  display: inline-block;
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+.cUserNav_register .ipsButton_primary {
+  margin-left: 10px;
+}
+
+.authSubmit {
+  background-color: #232430 !important;
+  border-color: #232430 !important;
+  color: #fff !important;
+}
+.authSubmit:hover,
+.authSubmit:focus {
+  background-color: #232430 !important;
+  border-color: #232430 !important;
+  color: #fff !important;
+}
+
+.authForgot {
+  color: #fff !important;
+  display: block;
+  text-align: right;
+  font-weight: 400 !important;
+}
+.authForgot:hover,
+.authForgot:focus {
+  color: #fff !important;
+}
+
+
+.ipsType_reset.ipsType_large.ipsType_light {
+    text-align: left;
+    margin-top: 10px;
+}

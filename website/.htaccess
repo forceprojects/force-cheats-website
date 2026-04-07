@@ -1,0 +1,9 @@
+RewriteEngine On
+
+# Serve .html files for clean URLs
+RewriteRule ^product$ products/product.html [L,QSA]
+RewriteRule ^product\.html$ products/product.html [L,QSA]
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_FILENAME}.html -f
+RewriteRule ^(.*)$ $1.html [L,QSA]
