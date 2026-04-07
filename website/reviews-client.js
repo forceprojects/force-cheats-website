@@ -1,5 +1,3 @@
-import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/+esm";
-
 const FALLBACK_SUPABASE_URL = "https://tjpxmbfekgnxtyujvyvx.supabase.co";
 const FALLBACK_SUPABASE_ANON_KEY = "sb_publishable_MY0T9tn8TU567ZRsnoZHyA_gGqyVs2W";
 
@@ -9,6 +7,8 @@ const ensureSupabase = () => {
   const url = String(window.kyloSupabaseUrl || FALLBACK_SUPABASE_URL);
   const key = String(window.kyloSupabaseAnonKey || FALLBACK_SUPABASE_ANON_KEY);
   if (!url || !key) return null;
+  const createClient = window.supabase?.createClient;
+  if (typeof createClient !== "function") return null;
   const sb = createClient(url, key, { auth: { persistSession: true, storage: window.localStorage } });
   window.kyloSupabase = sb;
   window.kyloSupabaseUrl = url;

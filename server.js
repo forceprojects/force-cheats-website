@@ -958,6 +958,10 @@ const injectStaticModuleCacheBusting = (html) => {
     /src=(["'])purchases-client\.js(?:\?[^"']*)?\1/gi,
     (_m, quote) => `src=${quote}purchases-client.js?v=${STATIC_BUST_VERSION}${quote}`
   );
+  next = next.replace(
+    /src=(["'])reviews-client\.js(?:\?[^"']*)?\1/gi,
+    (_m, quote) => `src=${quote}reviews-client.js?v=${STATIC_BUST_VERSION}${quote}`
+  );
   return next;
 };
 
