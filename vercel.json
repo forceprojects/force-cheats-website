@@ -5,14 +5,7 @@
       "includeFiles": "website/**"
     }
   },
-  "headers": [
-    {
-      "source": "/(.*\\.(?:js|css))",
-      "headers": [{ "key": "Cache-Control", "value": "no-store" }]
-    }
-  ],
   "routes": [
-    { "src": "/(.*\\.(?:js|css|map|png|jpg|jpeg|webp|gif|svg|ico|json|txt|woff2?|ttf|eot))", "dest": "/website/$1" },
     { "src": "/(.*)", "dest": "/api/index.js" }
   ]
 }

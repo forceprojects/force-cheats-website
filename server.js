@@ -6,6 +6,7 @@ const https = require("node:https");
 
 const PORT = Number.parseInt(process.env.PORT || "8000", 10) || 8000;
 const ROOT_DIR = path.join(__dirname, "website");
+const STATIC_BUST_VERSION = "20260407_1";
 
 const MIME_TYPES = {
   ".html": "text/html; charset=utf-8",
@@ -224,6 +225,7 @@ const serveFile = async (res, filePath) => {
     html = injectCleanUrlsIntoHtml(html);
     html = injectSupabaseSessionFromUrlIntoHtml(html);
     html = injectAuthUiFromLocalStorageIntoHtml(html);
+    html = injectStaticModuleCacheBusting(html);
     res.writeHead(200, headers);
     res.end(html);
     return;
@@ -930,6 +932,19 @@ const injectAuthUiFromLocalStorageIntoHtml = (html) => {
   }
   if (/<\/body>/i.test(html)) return html.replace(/<\/body>/i, script + "</body>");
   return html;
+};
+
+const injectStaticModuleCacheBusting = (html) => {
+  let next = html;
+  next = next.replace(
+    /src=(["'])supabase-auth\.js(?:\?[^"']*)?\1/gi,
+    (_m, quote) => `src=${quote}supabase-auth.js?v=${STATIC_BUST_VERSION}${quote}`
+  );
+  next = next.replace(
+    /src=(["'])purchases-client\.js(?:\?[^"']*)?\1/gi,
+    (_m, quote) => `src=${quote}purchases-client.js?v=${STATIC_BUST_VERSION}${quote}`
+  );
+  return next;
 };
 
 const DEFAULT_NOTIFICATIONS_CONFIG = {
