@@ -3032,48 +3032,12 @@ if (registerForm) {
   });
 }
 
-// Storrik embed functionality
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('Initializing Storrik embeds...');
-    
-    // Wait for Storrik to load
-    const initStorrik = () => {
-        if (window.storrik) {
-            console.log('Storrik loaded successfully');
-            setupProductButtons();
-        } else {
-            console.log('Waiting for Storrik to load...');
-            setTimeout(initStorrik, 500);
-        }
-    };
-    
-    const setupProductButtons = () => {
-        const productButtons = document.querySelectorAll('.purchase-btn[data-storrik-product]');
-        console.log('Found', productButtons.length, 'product buttons');
-        
-        productButtons.forEach(button => {
-            button.addEventListener('click', function(e) {
-                e.preventDefault();
-                
-                const productId = this.getAttribute('data-storrik-product');
-                const productName = this.getAttribute('data-product');
-                
-                console.log('Opening Storrik checkout for product:', productId, productName);
-                
 
-                
-                if (window.storrik && window.storrik.pay) {
-                    window.storrik.pay(storeId, productId);
-                } else {
-                    console.error('Storrik not available');
-                    alert('Payment system not available. Please try again later.');
-                }
-            });
-        });
-    };
+document.addEventListener('DOMContentLoaded', function() {
+
     
-    // Initialize Storrik
-    initStorrik();
+
+    
 });
 </script>
 <script>
@@ -3081,7 +3045,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const sectionTitle = document.querySelector('.cStore_wrapper .cStore_title');
   const grid = document.getElementById('product-grid');
   const categoryWrapper = document.getElementById('product-category-view');
-  // Mapping between product keys and URL hash labels
+  // Mappi ng 
   const keyToHash = { hwid: 'spoofers', rust: 'rust', r6s: 'r6s', arc: 'arc' };
   const hashToKey = { spoofers: 'hwid', rust: 'rust', r6s: 'r6s', arc: 'arc' };
 
@@ -3090,7 +3054,7 @@ document.addEventListener('DOMContentLoaded', () => {
     warning: { color: '#1d68d7', bg: 'rgba(29,104,215,0.20)' }
   };
 
-  // Preload product images immediately on page load
+
   const productImages = [
     'code-theme/images/SMALL-CARD/rust.png',
     'code-theme/images/SMALL-CARD/r6s.png',
@@ -3105,7 +3069,7 @@ document.addEventListener('DOMContentLoaded', () => {
     link.href = src;
     document.head.appendChild(link);
     
-    // Also preload via Image object
+
     const img = new Image();
     img.src = src;
   });
