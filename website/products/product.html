@@ -1809,10 +1809,10 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
           const rawTechBadges = Array.isArray(product?.techBadges) ? product.techBadges : [];
 
           const sanitizeIconClass = (value) => {
-            const s = String(value || '').trim();
-            if (!s) return '';
-            if (!/^[a-z0-9\\s-]+$/i.test(s)) return '';
-            return s;
+            const s0 = String(value || '').trim();
+            if (!s0) return '';
+            const cleaned = s0.replace(/[^a-z0-9\\s-]+/gi, ' ').replace(/\\s+/g, ' ').trim();
+            return cleaned;
           };
 
           const normalizeIconClass = (value) => {

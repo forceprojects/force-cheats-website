@@ -2075,7 +2075,14 @@ document.addEventListener('DOMContentLoaded', () => {
         p.badges = Array.isArray(p.badges) ? p.badges.slice(0, 3) : [];
         p.secondaryBadges = Array.isArray(p.secondaryBadges) ? p.secondaryBadges : [];
         p.secondaryBadges = p.secondaryBadges
-          .map((b) => ({ icon: String(b?.icon || '').trim(), text: String(b?.text || b?.label || '').trim() }))
+          .map((b) => ({
+            icon: String(b?.icon || '')
+              .trim()
+              .replace(/[^a-z0-9\s-]+/gi, ' ')
+              .replace(/\s+/g, ' ')
+              .trim(),
+            text: String(b?.text || b?.label || '').trim()
+          }))
           .filter((b) => b.text)
           .slice(0, 4);
         p.featuresBadges = p.secondaryBadges && p.secondaryBadges.length ? p.secondaryBadges : (Array.isArray(p.featuresBadges) ? p.featuresBadges : []);
