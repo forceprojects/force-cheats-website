@@ -1823,9 +1823,24 @@ const handleMoneyMotionCheckout = async (req, res) => {
       ? String(payload?.customer?.email || payload?.customerEmail || payload?.email || "").trim().toLowerCase()
       : "";
   const email = authedEmail || emailFromPayload;
-  const rawSuccessUrl = String(payload?.successUrl || payload?.urls?.success || "").trim();
-  const rawCancelUrl = String(payload?.cancelUrl || payload?.urls?.cancel || "").trim();
-  const rawFailureUrl = String(payload?.failureUrl || payload?.urls?.failure || rawCancelUrl || "").trim();
+  const stripWrappingTicks = (v) => {
+    const s = String(v || "").trim();
+    if (!s) return "";
+    const m = s.match(/^[`'"]+([\s\S]*?)[`'"]+$/);
+    return (m ? String(m[1] || "") : s).trim();
+  };
+
+  const sanitizeUrlInput = (v) => {
+    const s0 = stripWrappingTicks(v);
+    const s = s0.replace(/\s+/g, "").trim();
+    if (!s) return "";
+    if (s.toLowerCase().startsWith("javascript:")) return "";
+    return s;
+  };
+
+  const rawSuccessUrl = sanitizeUrlInput(payload?.successUrl || payload?.urls?.success || "");
+  const rawCancelUrl = sanitizeUrlInput(payload?.cancelUrl || payload?.urls?.cancel || "");
+  const rawFailureUrl = sanitizeUrlInput(payload?.failureUrl || payload?.urls?.failure || rawCancelUrl || "");
   const baseUrl = expectedHttps || expectedHttp || "http://localhost:8000";
   const toAbsoluteUrl = (value) => {
     const s = String(value || "").trim();
@@ -1898,15 +1913,7 @@ const handleMoneyMotionCheckout = async (req, res) => {
       const desc = String(i?.description || i?.variantName || "").trim();
       const qty = Number.isFinite(i?.quantity) ? Math.max(1, Math.floor(i.quantity)) : 1;
       const cents = toCents(i?.pricePerItemInCents ?? i?.unitAmount ?? i?.unitAmountInCents ?? i?.priceCents ?? 0);
-      return {
-        name,
-        description: desc || undefined,
-        quantity: qty,
-        pricePerItemInCents: cents,
-        unitAmountInCents: cents,
-        unitAmount: cents,
-        priceCents: cents,
-      };
+      return { name, description: desc || "Item", pricePerItemInCents: cents, quantity: qty };
     })
     .filter((x) => x.pricePerItemInCents > 0 && x.quantity > 0);
 
@@ -1923,17 +1930,34 @@ const handleMoneyMotionCheckout = async (req, res) => {
     return;
   }
 
-  const jsonPayload = {
+  if (!email) {
+    send(
+      res,
+      400,
+      {
+        "Content-Type": "application/json; charset=utf-8",
+        ...(allowOrigin ? { "Access-Control-Allow-Origin": allowOrigin, Vary: "Origin" } : {}),
+      },
+      JSON.stringify({ error: "Email is required for checkout" })
+    );
+    return;
+  }
+
+  const metadataFromPayload = payload && typeof payload === "object" ? payload?.metadata : null;
+  const metadata =
+    metadataFromPayload && typeof metadataFromPayload === "object" && !Array.isArray(metadataFromPayload)
+      ? metadataFromPayload
+      : undefined;
+
+  const mmInput = {
     description: String(payload?.description || "Checkout").trim(),
-    currency,
-    currencyCode: currency,
-    currency_code: currency,
     urls: {
       success: withCheckoutIdSuffix(successWithToken),
       cancel: withCheckoutIdSuffix(cancelUrl || `${expectedHttp || "http://localhost:8000"}/`),
       failure: withCheckoutIdSuffix(failureUrl || cancelUrl || `${expectedHttp || "http://localhost:8000"}/`),
     },
-    userInfo: email ? { email } : undefined,
+    ...(metadata ? { metadata } : {}),
+    userInfo: { email },
     lineItems,
   };
 
@@ -1998,37 +2022,12 @@ const handleMoneyMotionCheckout = async (req, res) => {
       return false;
     };
 
-    const batchUrl = (() => {
-      try {
-        const u = new URL(trpcUrl);
-        u.searchParams.set("batch", "1");
-        return u.toString();
-      } catch (_) {
-        return trpcUrl;
-      }
-    })();
-
-    upstream = await tryPost(batchUrl, { 0: jsonPayload }, "trpc_batch_post_map");
+    upstream = await tryPostRaw(trpcUrl, JSON.stringify(mmInput), "trpc_post_body_raw");
     if (shouldTryNext(upstream)) {
-      upstream = await tryPost(batchUrl, { 0: JSON.stringify(jsonPayload) }, "trpc_batch_post_map_string");
+      upstream = await tryPost(trpcUrl, { input: mmInput }, "trpc_post_body_input_wrapper");
     }
     if (shouldTryNext(upstream)) {
-      upstream = await tryPost(batchUrl, { 0: { json: jsonPayload } }, "trpc_batch_post_map_json_wrapper");
-    }
-    if (shouldTryNext(upstream)) {
-      upstream = await tryPost(batchUrl, { 0: { input: jsonPayload } }, "trpc_batch_post_map_input_wrapper");
-    }
-    if (shouldTryNext(upstream)) {
-      let qsUrl = batchUrl;
-      try {
-        const u = new URL(batchUrl);
-        u.searchParams.set("input", JSON.stringify({ 0: jsonPayload }));
-        qsUrl = u.toString();
-      } catch (_) {}
-      upstream = await tryPost(qsUrl, null, "trpc_batch_qs_input");
-    }
-    if (shouldTryNext(upstream)) {
-      upstream = await tryPostRaw(trpcUrl, JSON.stringify(jsonPayload), "trpc_post_body_raw");
+      upstream = await tryPost(trpcUrl, { json: mmInput }, "trpc_post_body_json_wrapper");
     }
   } catch (e) {
     send(

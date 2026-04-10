@@ -81,6 +81,24 @@
     return "";
   };
 
+  const CHECKOUT_EMAIL_KEY = "kylo_checkout_email_v1";
+
+  const getCheckoutEmail = () => {
+    const sbEmail = getSupabaseUserEmail();
+    if (sbEmail) return sbEmail;
+    try {
+      const stored = String(localStorage.getItem(CHECKOUT_EMAIL_KEY) || "").trim().toLowerCase();
+      if (stored) return stored;
+    } catch (_) {}
+    return "";
+  };
+
+  const isValidEmail = (value) => {
+    const s = String(value || "").trim();
+    if (!s) return false;
+    return /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/.test(s);
+  };
+
   const getSupabaseUserId = () => {
     try {
       const rawExact = localStorage.getItem(SUPABASE_AUTH_TOKEN_KEY);
@@ -280,7 +298,7 @@
     if (!sb) throw new Error("Supabase is not configured.");
     const { data } = await sb.auth.getSession();
     const token = data?.session?.access_token || "";
-    const email = getSupabaseUserEmail();
+    const email = getCheckoutEmail();
     const userId = getSupabaseUserId();
     const successUrl = !token && /purchases\.html/i.test(configuredSuccess) ? defaultSuccess : (configuredSuccess || defaultSuccess);
 
@@ -406,6 +424,17 @@
       if (!checkoutCart.items.length) {
         alert("This item is not configured for checkout.");
         return;
+      }
+
+      if (useMoneyMotion && !getCheckoutEmail()) {
+        const entered = String(window.prompt("Enter your email for delivery:") || "").trim().toLowerCase();
+        if (!isValidEmail(entered)) {
+          alert("A valid email is required for checkout.");
+          return;
+        }
+        try {
+          localStorage.setItem(CHECKOUT_EMAIL_KEY, entered);
+        } catch (_) {}
       }
 
       if (useMoneyMotion && checkoutConfig.devMode) {
