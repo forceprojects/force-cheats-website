@@ -1749,19 +1749,59 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
             '<div class="container">' +
             boxes +
             '</div>';
+
+          try {
+            if (!root.querySelector('.description_product')) {
+              const linkEl = root.querySelector('link[href="css/boxicons.min.css"]');
+              const section = document.createElement('section');
+              section.className = 'description_product';
+              const ft = document.createElement('div');
+              ft.className = 'features-tech';
+              ft.style.display = 'none';
+              section.appendChild(ft);
+
+              const children = Array.from(root.childNodes);
+              for (const n of children) {
+                if (linkEl && n === linkEl) continue;
+                if (n.nodeType === 3 && !String(n.textContent || '').trim()) {
+                  n.remove();
+                  continue;
+                }
+                section.appendChild(n);
+              }
+
+              if (linkEl && linkEl.parentNode === root) {
+                if (linkEl.nextSibling) root.insertBefore(section, linkEl.nextSibling);
+                else root.appendChild(section);
+              } else {
+                root.appendChild(section);
+              }
+            }
+          } catch (_) {}
         };
 
         const updateFeaturesTechBar = (product) => {
+          const byId = document.getElementById('featuresTechBar');
           const desc = document.querySelector('.description_product');
-          let legacy = desc ? desc.querySelector('.features-tech') : null;
-          if (!legacy && desc) {
-            legacy = document.createElement('div');
-            legacy.className = 'features-tech';
-            const before = desc.querySelector('.container') || desc.firstElementChild;
-            if (before) desc.insertBefore(legacy, before);
-            else desc.appendChild(legacy);
+          let target = null;
+          if (desc) {
+            let legacy = desc.querySelector('.features-tech');
+            if (!legacy) {
+              legacy = document.createElement('div');
+              legacy.className = 'features-tech';
+              const before = desc.querySelector('.container') || desc.firstElementChild;
+              if (before) desc.insertBefore(legacy, before);
+              else desc.appendChild(legacy);
+            }
+            target = legacy;
+            if (byId) {
+              byId.style.display = 'none';
+              byId.innerHTML = '';
+            }
+          } else if (byId) {
+            target = byId;
           }
-          const targets = legacy ? [legacy] : [];
+          const targets = target ? [target] : [];
           if (!targets.length) return;
 
           const rawSecondaryBadges = Array.isArray(product?.secondaryBadges) ? product.secondaryBadges : [];
@@ -2119,8 +2159,8 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
             updateImages(PRODUCT_IMAGE, product.galleryImages, PRODUCT_NAME);
             setStatus(String(product.statusText || ''), String(product.statusType || 'success'));
             updateBadges(product.badges);
-            updateFeaturesTechBar(product);
             updateFeatureSections(product);
+            updateFeaturesTechBar(product);
             rebuildVariants(product);
             try {
               window.lightboxImages = [PRODUCT_IMAGE].concat(Array.isArray(product.galleryImages) ? product.galleryImages.filter(Boolean) : []);
