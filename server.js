@@ -1929,6 +1929,7 @@ const handleMoneyMotionCheckout = async (req, res) => {
   const upstreamHeaders = {
     "Content-Type": "application/json",
     Accept: "application/json",
+    "User-Agent": `forcecheats/${STATIC_BUST_VERSION}`,
     "x-api-key": apiKey,
     "x-currency": currency,
   };
@@ -1971,6 +1972,25 @@ const handleMoneyMotionCheckout = async (req, res) => {
       return await postUpstream(url, bodyObj);
     };
 
+    const withBatch = (url) => {
+      try {
+        const u = new URL(url);
+        u.searchParams.set("batch", "1");
+        return u.toString();
+      } catch (_) {
+        return url;
+      }
+    };
+
+    const hasBatch = (url) => {
+      try {
+        const u = new URL(url);
+        return u.searchParams.get("batch") === "1";
+      } catch (_) {
+        return false;
+      }
+    };
+
     const shouldTryNext = (up) => {
       if (!up) return true;
       if (up.status === 400) return looksLikeTrpcInvalidRequest(up);
@@ -1979,28 +1999,29 @@ const handleMoneyMotionCheckout = async (req, res) => {
     };
 
     for (const baseUrl of urlCandidates) {
-      upstream = await tryPost(baseUrl, { json: jsonPayload }, "json");
-      if (!shouldTryNext(upstream)) break;
+      const attempts = [];
 
-      upstream = await tryPost(baseUrl, { input: jsonPayload }, "input");
-      if (!shouldTryNext(upstream)) break;
+      if (!hasBatch(baseUrl)) {
+        attempts.push({ url: baseUrl, body: { json: jsonPayload }, label: "json" });
+        attempts.push({ url: baseUrl, body: { input: jsonPayload }, label: "input" });
+        attempts.push({ url: baseUrl, body: { json: jsonPayload, input: jsonPayload }, label: "json+input" });
+        attempts.push({ url: baseUrl, body: { id: 0, json: jsonPayload }, label: "id0+json" });
+        attempts.push({ url: baseUrl, body: { id: 0, input: jsonPayload }, label: "id0+input" });
+      }
 
-      upstream = await tryPost(baseUrl, { json: jsonPayload, input: jsonPayload }, "json+input");
-      if (!shouldTryNext(upstream)) break;
+      const batchUrl = withBatch(baseUrl);
+      attempts.push({ url: batchUrl, body: { "0": { json: jsonPayload } }, label: "batch_obj0_json" });
+      attempts.push({ url: batchUrl, body: { "0": { input: jsonPayload } }, label: "batch_obj0_input" });
+      attempts.push({ url: batchUrl, body: [{ json: jsonPayload }], label: "batch_arr_json" });
+      attempts.push({ url: batchUrl, body: [{ id: 0, json: jsonPayload }], label: "batch_arr_id0_json" });
+      attempts.push({ url: batchUrl, body: [{ input: jsonPayload }], label: "batch_arr_input" });
+      attempts.push({ url: batchUrl, body: [{ id: 0, input: jsonPayload }], label: "batch_arr_id0_input" });
 
-      upstream = await tryPost(baseUrl, { id: 0, json: jsonPayload }, "id0+json");
-      if (!shouldTryNext(upstream)) break;
+      for (const a of attempts) {
+        upstream = await tryPost(a.url, a.body, a.label);
+        if (!shouldTryNext(upstream)) break;
+      }
 
-      let batchUrl = baseUrl;
-      try {
-        const u = new URL(baseUrl);
-        u.searchParams.set("batch", "1");
-        batchUrl = u.toString();
-      } catch (_) {}
-      upstream = await tryPost(batchUrl, { "0": { json: jsonPayload } }, "batch0_json");
-      if (!shouldTryNext(upstream)) break;
-
-      upstream = await tryPost(batchUrl, { "0": { input: jsonPayload } }, "batch0_input");
       if (!shouldTryNext(upstream)) break;
     }
   } catch (e) {
@@ -2029,6 +2050,7 @@ const handleMoneyMotionCheckout = async (req, res) => {
       JSON.stringify({
         error: `Upstream error (${upstream.status}): ${upstreamMsg}`,
         status: upstream.status,
+        serverVersion: STATIC_BUST_VERSION,
         attempt: upstreamAttempt || undefined,
         url: upstreamUsedUrl || undefined,
         body: upstreamBody,
