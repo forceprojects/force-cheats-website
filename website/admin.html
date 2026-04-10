@@ -3215,6 +3215,48 @@ document.addEventListener('DOMContentLoaded', () => {
       { label: 'Check', value: 'fa-solid fa-check' },
     ];
 
+    const secondaryPreviewWrap = document.createElement('div');
+    secondaryPreviewWrap.style.display = 'none';
+    secondaryPreviewWrap.style.marginTop = '10px';
+    const secondaryPreviewBar = document.createElement('div');
+    secondaryPreviewBar.style.display = 'flex';
+    secondaryPreviewBar.style.flexWrap = 'wrap';
+    secondaryPreviewBar.style.gap = '10px';
+    secondaryPreviewBar.style.padding = '10px 12px';
+    secondaryPreviewBar.style.borderRadius = '12px';
+    secondaryPreviewBar.style.background = 'rgba(255,255,255,0.03)';
+    secondaryPreviewBar.style.border = '1px solid rgba(255,255,255,0.06)';
+    secondaryPreviewWrap.appendChild(secondaryPreviewBar);
+    form.appendChild(secondaryPreviewWrap);
+
+    const renderSecondaryBadgesPreview = () => {
+      const items = (Array.isArray(product.secondaryBadges) ? product.secondaryBadges : [])
+        .map((b) => ({ icon: String(b?.icon || '').trim(), text: String(b?.text || b?.label || '').trim() }))
+        .filter((b) => b.text)
+        .slice(0, 4);
+      if (!items.length) {
+        secondaryPreviewWrap.style.display = 'none';
+        secondaryPreviewBar.innerHTML = '';
+        return;
+      }
+      secondaryPreviewWrap.style.display = '';
+      secondaryPreviewBar.innerHTML = items
+        .map((b) => {
+          const icon = b.icon || 'fa-solid fa-check';
+          return (
+            '<div style="display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:12px;background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.06);color:rgba(255,255,255,0.92);font-weight:700;">' +
+            '<i class="' +
+            escapeHtml(icon) +
+            '" style="opacity:.9;"></i>' +
+            '<span>' +
+            escapeHtml(b.text) +
+            '</span>' +
+            '</div>'
+          );
+        })
+        .join('');
+    };
+
     (Array.isArray(product.secondaryBadges) ? product.secondaryBadges.slice(0, 4) : []).forEach((b, idx) => {
       const box = document.createElement('div');
       box.className = 'ipsBox ipsPad_half';
@@ -3247,6 +3289,7 @@ document.addEventListener('DOMContentLoaded', () => {
           icon: String(select.value || '').trim(),
           text: String(input.value || '').trim(),
         };
+        renderSecondaryBadgesPreview();
         scheduleAutoSave();
         schedulePreview();
       };
@@ -3275,6 +3318,8 @@ document.addEventListener('DOMContentLoaded', () => {
       box.appendChild(rm);
       secondaryWrap.appendChild(box);
     });
+
+    renderSecondaryBadgesPreview();
 
     const sepManage = document.createElement('div');
     sepManage.style.borderTop = '1px solid rgba(255,255,255,0.06)';
