@@ -99,6 +99,145 @@
     return /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/.test(s);
   };
 
+  const showEmailCapture = () => {
+    return new Promise((resolve) => {
+      const existing = document.getElementById("mmEmailCapture");
+      if (existing) existing.remove();
+      const mask = document.createElement("div");
+      mask.id = "mmEmailCapture";
+      mask.style.position = "fixed";
+      mask.style.inset = "0";
+      mask.style.background = "rgba(0,0,0,0.6)";
+      mask.style.display = "flex";
+      mask.style.alignItems = "center";
+      mask.style.justifyContent = "center";
+      mask.style.zIndex = "100000";
+
+      const dialog = document.createElement("div");
+      dialog.className = "ipsBox ipsPad";
+      dialog.style.width = "min(92vw, 420px)";
+      dialog.style.background = "rgb(var(--theme-area_background))";
+      dialog.style.border = "1px solid rgba(255,255,255,.12)";
+      dialog.style.borderRadius = "12px";
+      dialog.style.boxShadow = "0 12px 40px rgba(0,0,0,.45)";
+
+      const title = document.createElement("div");
+      title.style.fontWeight = "900";
+      title.style.fontSize = "16px";
+      title.style.marginBottom = "8px";
+      title.textContent = "Enter your email";
+
+      const desc = document.createElement("div");
+      desc.style.fontSize = "12px";
+      desc.style.color = "rgba(255,255,255,.7)";
+      desc.style.marginBottom = "10px";
+      desc.textContent = "We will deliver your license to this email.";
+
+      const input = document.createElement("input");
+      input.type = "email";
+      input.placeholder = "name@example.com";
+      input.className = "ipsField_fullWidth";
+      input.style.height = "44px";
+      input.style.borderRadius = "10px";
+      input.style.border = "1px solid rgba(255,255,255,.12)";
+      input.style.background = "rgba(255,255,255,.04)";
+      input.style.color = "rgba(255,255,255,.92)";
+      input.style.padding = "0 12px";
+      input.value = getCheckoutEmail();
+
+      const error = document.createElement("div");
+      error.style.color = "#d71d1d";
+      error.style.fontSize = "12px";
+      error.style.marginTop = "6px";
+      error.style.display = "none";
+      error.textContent = "Please enter a valid email address.";
+
+      const actions = document.createElement("div");
+      actions.style.display = "grid";
+      actions.style.gridTemplateColumns = "1fr 1fr";
+      actions.style.gap = "10px";
+      actions.style.marginTop = "16px";
+
+      const cancel = document.createElement("button");
+      cancel.type = "button";
+      cancel.className = "ipsButton ipsButton_light";
+      cancel.textContent = "Cancel";
+      const ok = document.createElement("button");
+      ok.type = "button";
+      ok.className = "ipsButton ipsButton_primary";
+      ok.textContent = "Continue";
+
+      actions.appendChild(cancel);
+      actions.appendChild(ok);
+      dialog.appendChild(title);
+      dialog.appendChild(desc);
+      dialog.appendChild(input);
+      dialog.appendChild(error);
+      dialog.appendChild(actions);
+      mask.appendChild(dialog);
+      document.body.appendChild(mask);
+
+      const close = (val) => {
+        mask.remove();
+        resolve(val);
+      };
+      cancel.addEventListener("click", () => close(null));
+      mask.addEventListener("click", (e) => {
+        if (e.target === mask) close(null);
+      });
+      ok.addEventListener("click", () => {
+        const val = String(input.value || "").trim().toLowerCase();
+        if (!isValidEmail(val)) {
+          error.style.display = "";
+          input.focus();
+          return;
+        }
+        try {
+          localStorage.setItem(CHECKOUT_EMAIL_KEY, val);
+        } catch (_) {}
+        close(val);
+      });
+      setTimeout(() => input.focus(), 0);
+    });
+  };
+
+  const ensureLoadingStyles = () => {
+    let s = document.getElementById("kyloCheckoutLoadingStyles");
+    if (s) return;
+    s = document.createElement("style");
+    s.id = "kyloCheckoutLoadingStyles";
+    s.textContent =
+      "#mmCheckoutLoading{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100000;display:flex;align-items:center;justify-content:center}" +
+      "#mmCheckoutLoading .mmLoadingBox{width:min(92vw,360px);background:rgba(19,21,29,.98);border:1px solid rgba(255,255,255,.12);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.45);padding:20px 18px;display:flex;gap:12px;align-items:center;justify-content:center}" +
+      "#mmCheckoutLoading .mmSpinner{width:18px;height:18px;border-radius:999px;border:2px solid rgba(255,255,255,.25);border-top-color:var(--theme-brand_accent_hex,#1d68d7);animation:mmspin .9s linear infinite}" +
+      "@keyframes mmspin{to{transform:rotate(360deg)}}" +
+      "#mmCheckoutLoading .mmText{color:rgba(255,255,255,.92);font-weight:700;font-size:14px}";
+    document.head.appendChild(s);
+  };
+
+  const showCheckoutLoading = (text) => {
+    ensureLoadingStyles();
+    if (document.getElementById("mmCheckoutLoading")) return;
+    const mask = document.createElement("div");
+    mask.id = "mmCheckoutLoading";
+    const box = document.createElement("div");
+    box.className = "mmLoadingBox";
+    const sp = document.createElement("div");
+    sp.className = "mmSpinner";
+    const label = document.createElement("div");
+    label.className = "mmText";
+    label.textContent = String(text || "Creating checkout session…");
+    box.appendChild(sp);
+    box.appendChild(label);
+    mask.appendChild(box);
+    document.body.appendChild(mask);
+  };
+
+  const hideCheckoutLoading = () => {
+    const el = document.getElementById("mmCheckoutLoading");
+    if (el) el.remove();
+  };
+
   const getSupabaseUserId = () => {
     try {
       const rawExact = localStorage.getItem(SUPABASE_AUTH_TOKEN_KEY);
@@ -427,16 +566,11 @@
       }
 
       if (useMoneyMotion && !getCheckoutEmail()) {
-        const entered = String(window.prompt("Enter your email for delivery:") || "").trim().toLowerCase();
-        if (!isValidEmail(entered)) {
-          alert("A valid email is required for checkout.");
-          return;
-        }
-        try {
-          localStorage.setItem(CHECKOUT_EMAIL_KEY, entered);
-        } catch (_) {}
+        const entered = await showEmailCapture();
+        if (!entered) return;
       }
 
+      showCheckoutLoading("Creating checkout session…");
       if (useMoneyMotion && checkoutConfig.devMode) {
         const sb = await ensureSupabase();
         if (!sb) throw new Error("Supabase is not configured.");
@@ -461,6 +595,7 @@
             : appendCheckoutIdParam("http://localhost:8000/success", checkoutId);
         closeAddedModal();
         toggleCartMenu(false);
+        hideCheckoutLoading();
         window.location.assign(successUrl);
         return;
       }
@@ -470,8 +605,10 @@
       const checkoutUrl = useMoneyMotion
         ? await createMoneyMotionCheckoutUrl(checkoutCart, checkoutConfig)
         : await createShopifyCheckoutUrl(checkoutCart);
+      hideCheckoutLoading();
       window.location.assign(checkoutUrl);
     } catch (err) {
+      hideCheckoutLoading();
       const message = err instanceof Error ? err.message : "Checkout failed. Please try again.";
       console.error(err);
       alert(message);
