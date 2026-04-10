@@ -2002,14 +2002,31 @@ const handleMoneyMotionCheckout = async (req, res) => {
       try {
         const u = new URL(trpcUrl);
         u.searchParams.set("batch", "1");
-        u.searchParams.set("input", JSON.stringify({ 0: jsonPayload }));
         return u.toString();
       } catch (_) {
         return trpcUrl;
       }
     })();
 
-    upstream = await tryPost(batchUrl, null, "trpc_batch_qs_input");
+    upstream = await tryPost(batchUrl, { 0: jsonPayload }, "trpc_batch_post_map");
+    if (shouldTryNext(upstream)) {
+      upstream = await tryPost(batchUrl, { 0: JSON.stringify(jsonPayload) }, "trpc_batch_post_map_string");
+    }
+    if (shouldTryNext(upstream)) {
+      upstream = await tryPost(batchUrl, { 0: { json: jsonPayload } }, "trpc_batch_post_map_json_wrapper");
+    }
+    if (shouldTryNext(upstream)) {
+      upstream = await tryPost(batchUrl, { 0: { input: jsonPayload } }, "trpc_batch_post_map_input_wrapper");
+    }
+    if (shouldTryNext(upstream)) {
+      let qsUrl = batchUrl;
+      try {
+        const u = new URL(batchUrl);
+        u.searchParams.set("input", JSON.stringify({ 0: jsonPayload }));
+        qsUrl = u.toString();
+      } catch (_) {}
+      upstream = await tryPost(qsUrl, null, "trpc_batch_qs_input");
+    }
     if (shouldTryNext(upstream)) {
       upstream = await tryPostRaw(trpcUrl, JSON.stringify(jsonPayload), "trpc_post_body_raw");
     }
