@@ -2078,6 +2078,7 @@ document.addEventListener('DOMContentLoaded', () => {
           .map((b) => ({ icon: String(b?.icon || '').trim(), text: String(b?.text || b?.label || '').trim() }))
           .filter((b) => b.text)
           .slice(0, 4);
+        p.featuresBadges = p.secondaryBadges && p.secondaryBadges.length ? p.secondaryBadges : (Array.isArray(p.featuresBadges) ? p.featuresBadges : []);
       });
     } catch (_) {}
     try {
