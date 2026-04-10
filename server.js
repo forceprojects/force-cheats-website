@@ -6,7 +6,7 @@ const https = require("node:https");
 
 const PORT = Number.parseInt(process.env.PORT || "8000", 10) || 8000;
 const ROOT_DIR = path.join(__dirname, "website");
-const STATIC_BUST_VERSION = "20260407_1";
+const STATIC_BUST_VERSION = "20260408_3";
 
 const MIME_TYPES = {
   ".html": "text/html; charset=utf-8",
@@ -961,6 +961,10 @@ const injectStaticModuleCacheBusting = (html) => {
   next = next.replace(
     /src=(["'])reviews-client\.js(?:\?[^"']*)?\1/gi,
     (_m, quote) => `src=${quote}reviews-client.js?v=${STATIC_BUST_VERSION}${quote}`
+  );
+  next = next.replace(
+    /src=(["'])mobile-drawer\.js(?:\?[^"']*)?\1/gi,
+    (_m, quote) => `src=${quote}mobile-drawer.js?v=${STATIC_BUST_VERSION}${quote}`
   );
   return next;
 };

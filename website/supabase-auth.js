@@ -21,6 +21,7 @@ const mobileSignIn = document.getElementById("elSigninButton_mobile");
 const signUpDesktop = document.getElementById("elRegisterButton");
 const signUpMobile = document.getElementById("elRegisterButton_mobile");
 const menu = document.getElementById("elUserSignIn_menu");
+const mobileDrawerNav = document.getElementById("elUserNav_mobile");
 
 const originalDesktopSignInHtml = desktopSignIn ? desktopSignIn.innerHTML : null;
 const originalMobileSignInText = mobileSignIn ? mobileSignIn.textContent : null;
@@ -64,6 +65,21 @@ const getSiteIndexUrl = () => new URL("../index.html", window.location.href).hre
 const getSiteProfileUrl = () => new URL("../profile.html", window.location.href).href;
 const getSiteSettingsUrl = () => new URL("../settings.html?overview", window.location.href).href;
 const getSitePurchasesUrl = () => new URL("../purchases.html", window.location.href).href;
+const getSiteRegisterUrl = () => new URL("../register.html", window.location.href).href;
+
+const ensureMobileDrawerAuthStyles = () => {
+  if (document.getElementById("kyloMobileDrawerAuthStyles")) return;
+  const style = document.createElement("style");
+  style.id = "kyloMobileDrawerAuthStyles";
+  style.textContent = `
+#elUserNav_mobile.kyloMobileDrawerAuth{list-style:none;margin:0;padding:14px 14px 0 14px;display:flex;flex-direction:column;gap:10px}
+#elUserNav_mobile.kyloMobileDrawerAuth>li{list-style:none;margin:0;padding:0}
+#elUserNav_mobile.kyloMobileDrawerAuth .kyloMobileAuthForm{margin-top:10px}
+#elUserNav_mobile.kyloMobileDrawerAuth .kyloMobileAuthForm .ipsFieldRow{margin:0}
+#elUserNav_mobile.kyloMobileDrawerAuth .kyloMobileAuthForm input{width:100%}
+`.trim();
+  document.head.appendChild(style);
+};
 
 const normalizeUsername = (value) => {
   const s = String(value || "").trim().toLowerCase();
@@ -367,6 +383,63 @@ const bindMenuTriggers = () => {
   }
 };
 
+const isMenuOpen = () => Boolean(menu && !menu.classList.contains("ipsHide"));
+
+const closeLoginMenu = () => {
+  if (!menu) return;
+  menu.classList.add("ipsHide");
+  menu.style.position = "";
+  menu.style.top = "";
+  menu.style.left = "";
+  menu.style.right = "";
+  menu.style.zIndex = "";
+  menu.style.maxWidth = "";
+  menu.style.width = "";
+  menu.style.display = "";
+  try {
+    desktopSignIn?.setAttribute?.("aria-expanded", "false");
+  } catch (_) {}
+  try {
+    mobileSignIn?.setAttribute?.("aria-expanded", "false");
+  } catch (_) {}
+};
+
+const positionLoginMenu = (anchor) => {
+  if (!menu) return;
+  const rect = anchor?.getBoundingClientRect?.();
+  const vw = Math.max(320, window.innerWidth || 0);
+  const margin = 12;
+  const maxW = Math.min(360, Math.max(260, vw - margin * 2));
+  const r = rect || { left: margin, right: vw - margin, bottom: margin };
+  let left = r.right - maxW;
+  left = Math.max(margin, Math.min(left, vw - maxW - margin));
+  const top = Math.max(margin, (r.bottom || 0) + 8);
+
+  menu.style.position = "fixed";
+  menu.style.zIndex = "2147483647";
+  menu.style.maxWidth = String(maxW) + "px";
+  menu.style.width = String(maxW) + "px";
+  menu.style.left = String(Math.round(left)) + "px";
+  menu.style.top = String(Math.round(top)) + "px";
+  menu.style.right = "auto";
+  menu.style.display = "block";
+};
+
+const openLoginMenu = (anchor) => {
+  if (!menu) return;
+  menu.classList.remove("ipsHide");
+  positionLoginMenu(anchor || desktopSignIn || mobileSignIn);
+  try {
+    (anchor || desktopSignIn || mobileSignIn)?.setAttribute?.("aria-expanded", "true");
+  } catch (_) {}
+};
+
+const toggleLoginMenu = (anchor) => {
+  if (!menu) return;
+  if (isMenuOpen()) closeLoginMenu();
+  else openLoginMenu(anchor);
+};
+
 const signInWithGoogle = async () => {
   if (!canUseSupabase()) {
     alert("Supabase is not configured.");
@@ -402,9 +475,77 @@ const bindGlobalInterceptors = () => {
     (e) => {
       const a = e.target?.closest?.("#elUserSignIn, #elSigninButton_mobile");
       if (!a) return;
-      const href = a.getAttribute("href") || "";
-      if (href.startsWith("http")) a.setAttribute("href", "#");
       e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      a.setAttribute("href", "#");
+      toggleLoginMenu(a);
+    },
+    true
+  );
+
+  document.addEventListener(
+    "click",
+    (e) => {
+      if (!isMenuOpen()) return;
+      const target = e.target;
+      if (menu && (target === menu || menu.contains(target))) return;
+      const trigger = target?.closest?.("#elUserSignIn, #elSigninButton_mobile");
+      if (trigger) return;
+      closeLoginMenu();
+    },
+    true
+  );
+
+  document.addEventListener(
+    "keydown",
+    (e) => {
+      if (e.key !== "Escape") return;
+      if (!isMenuOpen()) return;
+      closeLoginMenu();
+    },
+    true
+  );
+
+  window.addEventListener(
+    "resize",
+    () => {
+      if (!isMenuOpen()) return;
+      positionLoginMenu(desktopSignIn || mobileSignIn);
+    },
+    { passive: true }
+  );
+
+  document.addEventListener(
+    "click",
+    async (e) => {
+      const btn = e.target?.closest?.("[data-kylo-signout]");
+      if (!btn) return;
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      try {
+        if (supabase) await supabase.auth.signOut();
+        setSignedOutUi();
+        window.location.reload();
+      } catch (err) {
+        alert("Logout failed: " + (err?.message || err));
+      }
+    },
+    true
+  );
+
+  document.addEventListener(
+    "click",
+    (e) => {
+      const btn = e.target?.closest?.("[data-kylo-mobile-auth-toggle]");
+      if (!btn) return;
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      const root = btn.closest?.("li")?.querySelector?.("[data-kylo-mobile-auth-form]");
+      if (!root) return;
+      root.classList.toggle("ipsHide");
     },
     true
   );
@@ -467,6 +608,152 @@ const bindGlobalInterceptors = () => {
   );
 };
 
+const clearMobileDrawerNav = () => {
+  if (!mobileDrawerNav) return;
+  mobileDrawerNav.replaceChildren();
+  mobileDrawerNav.classList.add("kyloMobileDrawerAuth");
+};
+
+const makeDrawerLinkButton = (label, href, className) => {
+  const li = document.createElement("li");
+  const a = document.createElement("a");
+  a.href = href;
+  a.className = className;
+  a.textContent = label;
+  li.appendChild(a);
+  return li;
+};
+
+const makeDrawerActionButton = (label, className, attrs = {}) => {
+  const li = document.createElement("li");
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = className;
+  btn.textContent = label;
+  Object.entries(attrs || {}).forEach(([k, v]) => {
+    try {
+      btn.setAttribute(k, String(v));
+    } catch (_) {}
+  });
+  li.appendChild(btn);
+  return li;
+};
+
+const buildMobileDrawerSignedOut = () => {
+  if (!mobileDrawerNav) return;
+  ensureMobileDrawerAuthStyles();
+  clearMobileDrawerNav();
+
+  mobileDrawerNav.appendChild(
+    makeDrawerActionButton("Sign In", "ipsButton ipsButton_primary ipsButton_medium ipsButton_fullWidth", {
+      "data-kylo-mobile-auth-toggle": "1"
+    })
+  );
+  mobileDrawerNav.appendChild(
+    makeDrawerLinkButton("Sign Up", getSiteRegisterUrl(), "ipsButton ipsButton_normal ipsButton_primary ipsButton_medium ipsButton_fullWidth")
+  );
+
+  const formWrapLi = document.createElement("li");
+  const formWrap = document.createElement("div");
+  formWrap.className = "kyloMobileAuthForm ipsHide";
+  formWrap.setAttribute("data-kylo-mobile-auth-form", "1");
+
+  const form = document.createElement("form");
+  form.setAttribute("accept-charset", "utf-8");
+  form.setAttribute("method", "post");
+  form.setAttribute("action", "#");
+
+  const pad = document.createElement("div");
+  pad.className = "ipsPad ipsForm ipsForm_vertical";
+
+  const title = document.createElement("h4");
+  title.className = "ipsType_sectionHead";
+  title.textContent = "Sign In";
+  pad.appendChild(title);
+
+  const list = document.createElement("ul");
+  list.className = "ipsList_reset";
+
+  const emailLi = document.createElement("li");
+  emailLi.className = "ipsFieldRow ipsFieldRow_noLabel ipsFieldRow_fullWidth";
+  const email = document.createElement("input");
+  email.type = "email";
+  email.name = "auth";
+  email.placeholder = "Email Address";
+  email.autocomplete = "email";
+  emailLi.appendChild(email);
+  list.appendChild(emailLi);
+
+  const passLi = document.createElement("li");
+  passLi.className = "ipsFieldRow ipsFieldRow_noLabel ipsFieldRow_fullWidth";
+  const pass = document.createElement("input");
+  pass.type = "password";
+  pass.name = "password";
+  pass.placeholder = "Password";
+  pass.autocomplete = "current-password";
+  passLi.appendChild(pass);
+  list.appendChild(passLi);
+
+  const submitLi = document.createElement("li");
+  submitLi.className = "ipsFieldRow ipsFieldRow_fullWidth";
+  const submitBtn = document.createElement("button");
+  submitBtn.type = "submit";
+  submitBtn.name = "_processLogin";
+  submitBtn.value = "usernamepassword";
+  submitBtn.className = "ipsButton ipsButton_primary ipsButton_small ipsButton_fullWidth";
+  submitBtn.textContent = "Sign In";
+  submitLi.appendChild(submitBtn);
+  list.appendChild(submitLi);
+
+  const googleLi = document.createElement("li");
+  googleLi.className = "ipsFieldRow ipsFieldRow_fullWidth";
+  const googleBtn = document.createElement("button");
+  googleBtn.type = "submit";
+  googleBtn.name = "_processLogin";
+  googleBtn.value = "3";
+  googleBtn.className = "ipsButton ipsButton_verySmall ipsButton_fullWidth ipsSocial ipsSocial_google";
+  googleBtn.style.backgroundColor = "#4285F4";
+  const googleIcon = document.createElement("span");
+  googleIcon.className = "ipsSocial_icon";
+  const googleI = document.createElement("i");
+  googleI.className = "fa fa-google";
+  googleIcon.appendChild(googleI);
+  const googleText = document.createElement("span");
+  googleText.className = "ipsSocial_text";
+  googleText.textContent = "Sign in with Google";
+  googleBtn.appendChild(googleIcon);
+  googleBtn.appendChild(googleText);
+  googleLi.appendChild(googleBtn);
+  list.appendChild(googleLi);
+
+  pad.appendChild(list);
+  form.appendChild(pad);
+  formWrap.appendChild(form);
+  formWrapLi.appendChild(formWrap);
+  mobileDrawerNav.appendChild(formWrapLi);
+};
+
+const buildMobileDrawerSignedIn = (user) => {
+  if (!mobileDrawerNav) return;
+  ensureMobileDrawerAuthStyles();
+  clearMobileDrawerNav();
+
+  mobileDrawerNav.appendChild(
+    makeDrawerLinkButton("My Purchases", getSitePurchasesUrl(), "ipsButton ipsButton_primary ipsButton_medium ipsButton_fullWidth")
+  );
+  mobileDrawerNav.appendChild(
+    makeDrawerLinkButton("My Profile", getSiteProfileUrl(), "ipsButton ipsButton_light ipsButton_medium ipsButton_fullWidth")
+  );
+  mobileDrawerNav.appendChild(
+    makeDrawerLinkButton("Account Settings", getSiteSettingsUrl(), "ipsButton ipsButton_light ipsButton_medium ipsButton_fullWidth")
+  );
+  mobileDrawerNav.appendChild(
+    makeDrawerActionButton("Sign Out", "ipsButton ipsButton_light ipsButton_medium ipsButton_fullWidth", {
+      "data-kylo-signout": "1"
+    })
+  );
+};
+
 const setSignedOutUi = () => {
   window.currentUser = null;
   if (desktopSignIn && originalDesktopSignInHtml !== null) desktopSignIn.innerHTML = originalDesktopSignInHtml;
@@ -475,6 +762,8 @@ const setSignedOutUi = () => {
   if (signUpMobile) signUpMobile.style.display = "";
   if (menu && originalMenuHtml !== null) menu.innerHTML = originalMenuHtml;
   bindHeaderLogin();
+  closeLoginMenu();
+  buildMobileDrawerSignedOut();
 };
 
 const setSignedInUi = (user) => {
@@ -498,6 +787,7 @@ const setSignedInUi = (user) => {
   if (signUpMobile) signUpMobile.style.display = "none";
   buildSignedInMenu(user);
   ensureProfileRow(user);
+  buildMobileDrawerSignedIn(user);
 };
 
 const bindHeaderLogin = () => {
@@ -593,7 +883,7 @@ const initNotice = () => {
   window.history.replaceState({}, document.title, url.pathname + (url.search ? url.search : "") + url.hash);
 };
 
-if (desktopSignIn || mobileSignIn || menu) {
+if (desktopSignIn || mobileSignIn || menu || mobileDrawerNav) {
   ensureMiniCardStyles();
   bindGlobalInterceptors();
   bindMenuTriggers();

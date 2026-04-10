@@ -554,7 +554,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 			
 			
 			
-			<i class="fa fa-navicon"></i>
+			<i class="fa-solid fa-bars"></i>
 		</a>
 	</li>
 </ul>
@@ -935,6 +935,8 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
         </div>
     </div>
 
+    <div class="features-tech" id="featuresTechBar"></div>
+
     <ul class="elCluster_buttons" id="variant-buttons"></ul>
     <!-- Purchase Now Button -->
     <div class="purchase-section">
@@ -997,24 +999,6 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 <div class="ipsType_richText ipsType_normal ipsType_break ipsContained" data-controller="core.front.core.lightboxedImages">
 <link href="css/boxicons.min.css" rel="stylesheet">
 <section class="description_product">
-	<div class="features-tech">
-		<div class="features-tech-badge features-os">
-			<span class="features-icon"><i class="fas fa-desktop"></i></span> Windows 10 & 11
-		</div>
-
-		<div class="features-tech-badge features-security">
-			<span class="features-icon"><i class="fas fa-lock"></i></span> External Client
-		</div>
-
-		<div class="features-tech-badge features-performance">
-			<span class="features-icon"><i class="fas fa-layer-group"></i></span> Stream Proof
-		</div>
-
-		<div class="features-tech-badge features-cpu">
-			<span class="features-icon"><i class="fas fa-microchip"></i></span> Intel & AMD CPU's
-		</div>
-	</div>
-
 	<div class="container">
 		<div class="box">
 			<h2>Aimbot</h2>
@@ -1728,26 +1712,12 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
           const root = document.querySelector('.description_product');
           if (!root) return;
           const sections = Array.isArray(product?.featureSections) ? product.featureSections : [];
-          const techBadges = Array.isArray(product?.techBadges) ? product.techBadges : [];
           const featuresHtml = String(product?.featuresHtml || '').trim();
 
-          if (!sections.length && !techBadges.length) {
-            root.innerHTML = featuresHtml || '';
+          if (!sections.length) {
+            if (featuresHtml) root.innerHTML = featuresHtml;
             return;
           }
-
-          const tech = techBadges
-            .map((t) => String(t || '').trim())
-            .filter(Boolean)
-            .map((t) => {
-              return (
-                '<div class="features-tech-badge">' +
-                '<span class="features-icon"><i class="fas fa-check"></i></span> ' +
-                escapeHtml(t) +
-                '</div>'
-              );
-            })
-            .join('');
 
           const boxes = sections
             .map((s) => {
@@ -1775,12 +1745,76 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
             .join('');
           root.innerHTML =
             '<link href="css/boxicons.min.css" rel="stylesheet">' +
-            '<div class="features-tech">' +
-            tech +
-            '</div>' +
+            (featuresHtml ? featuresHtml : '') +
             '<div class="container">' +
             boxes +
             '</div>';
+        };
+
+        const updateFeaturesTechBar = (product) => {
+          const bar = document.getElementById('featuresTechBar');
+          if (!bar) return;
+
+          const rawFeaturesBadges = Array.isArray(product?.featuresBadges) ? product.featuresBadges : [];
+          const rawTechBadges = Array.isArray(product?.techBadges) ? product.techBadges : [];
+
+          const sanitizeIconClass = (value) => {
+            const s = String(value || '').trim();
+            if (!s) return '';
+            if (!/^[a-z0-9\\s-]+$/i.test(s)) return '';
+            if (!/(^|\\s)fa-/.test(s)) return '';
+            return s;
+          };
+
+          const featuresBadges = rawFeaturesBadges
+            .map((b) => {
+              const icon = sanitizeIconClass(b?.icon);
+              const text = String(b?.text || b?.label || '').trim();
+              return { icon, text };
+            })
+            .filter((b) => b.text)
+            .slice(0, 4);
+
+          if (featuresBadges.length) {
+            bar.style.display = '';
+            bar.innerHTML = featuresBadges
+              .map((b) => {
+                const icon = b.icon || 'fa-solid fa-check';
+                return (
+                  '<div class="features-tech-badge">' +
+                  '<span class="features-icon"><i class="' +
+                  escapeHtml(icon) +
+                  '"></i></span> ' +
+                  escapeHtml(b.text) +
+                  '</div>'
+                );
+              })
+              .join('');
+            return;
+          }
+
+          const techBadges = rawTechBadges
+            .map((t) => String(t || '').trim())
+            .filter(Boolean)
+            .slice(0, 4);
+
+          if (techBadges.length) {
+            bar.style.display = '';
+            bar.innerHTML = techBadges
+              .map((t) => {
+                return (
+                  '<div class="features-tech-badge">' +
+                  '<span class="features-icon"><i class="fa-solid fa-check"></i></span> ' +
+                  escapeHtml(t) +
+                  '</div>'
+                );
+              })
+              .join('');
+            return;
+          }
+
+          bar.style.display = 'none';
+          bar.innerHTML = '';
         };
 
         const updateHeaderText = (name) => {
@@ -2043,6 +2077,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                   variants: [],
                   featuresHtml: '',
                   techBadges: [],
+                  featuresBadges: [],
                   featureSections: [],
                   statusText: '',
                   statusType: 'success',
@@ -2062,6 +2097,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
             updateImages(PRODUCT_IMAGE, product.galleryImages, PRODUCT_NAME);
             setStatus(String(product.statusText || ''), String(product.statusType || 'success'));
             updateBadges(product.badges);
+            updateFeaturesTechBar(product);
             updateFeatureSections(product);
             rebuildVariants(product);
             try {
@@ -2077,6 +2113,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
             if (list) list.innerHTML = '';
             updateDisplayedPrice('');
             updateBadges([]);
+            updateFeaturesTechBar({ featuresBadges: [], techBadges: [] });
             updateFeatureSections({ featureSections: [], techBadges: [], featuresHtml: '' });
             const features = document.querySelector('.ipsType_richText');
             const err = String(window.__storeConfigLoadError || '').trim();
