@@ -1792,10 +1792,25 @@ const handleMoneyMotionCheckout = async (req, res) => {
   }
 
   const toCents = (v) => {
-    if (Number.isFinite(v)) return Math.max(0, Math.round(v));
+    if (Number.isFinite(v)) {
+      if (Number.isInteger(v)) return Math.max(0, Math.round(v));
+      return Math.max(0, Math.round(v * 100));
+    }
     const s = String(v || "").trim();
     if (!s) return 0;
-    const normalized = s.replace(/\s+/g, "").replace("€", "").replace("$", "").replace(",", ".").replace(/[^0-9.]/g, "");
+    const raw = s.replace(/\s+/g, "").replace("€", "").replace("$", "");
+    if (/^\d+$/.test(raw)) return Math.max(0, Math.round(Number(raw)));
+
+    const lastComma = raw.lastIndexOf(",");
+    const lastDot = raw.lastIndexOf(".");
+    let normalized = raw;
+    if (lastComma >= 0 && lastDot >= 0) {
+      const decimalIsComma = lastComma > lastDot;
+      normalized = decimalIsComma ? raw.replace(/\./g, "").replace(",", ".") : raw.replace(/,/g, "");
+    } else if (lastComma >= 0) {
+      normalized = raw.replace(",", ".");
+    }
+    normalized = normalized.replace(/[^0-9.]/g, "");
     const n = Number.parseFloat(normalized);
     if (!Number.isFinite(n)) return 0;
     return Math.max(0, Math.round(n * 100));
@@ -1845,16 +1860,16 @@ const handleMoneyMotionCheckout = async (req, res) => {
   const withCheckoutIdSuffix = (url) => {
     const s = String(url || "").trim();
     if (!s) return "";
-    if (s.endsWith("?=") || s.endsWith("&=") || s.endsWith("=")) return s;
-    if (s.includes("?")) return s + (s.endsWith("?") || s.endsWith("&") ? "=" : "&=");
-    return s + "?=";
+    if (s.endsWith("checkoutSessionId=")) return s;
+    if (s.includes("?")) return s + (s.endsWith("?") || s.endsWith("&") ? "" : "&") + "checkoutSessionId=";
+    return s + "?checkoutSessionId=";
   };
 
   const stripCheckoutIdSuffix = (url) => {
     const s = String(url || "").trim();
     if (!s) return "";
-    if (s.endsWith("?=") || s.endsWith("&=")) return s.slice(0, -2);
-    if (s.endsWith("=")) return s.slice(0, -1);
+    if (s.endsWith("?checkoutSessionId=")) return s.slice(0, -("checkoutSessionId=".length + 1));
+    if (s.endsWith("&checkoutSessionId=")) return s.slice(0, -("checkoutSessionId=".length + 1));
     return s;
   };
 
@@ -1884,6 +1899,19 @@ const handleMoneyMotionCheckout = async (req, res) => {
       return { name, description: desc || undefined, pricePerItemInCents: cents, quantity: qty };
     })
     .filter((x) => x.pricePerItemInCents > 0 && x.quantity > 0);
+
+  if (!lineItems.length) {
+    send(
+      res,
+      400,
+      {
+        "Content-Type": "application/json; charset=utf-8",
+        ...(allowOrigin ? { "Access-Control-Allow-Origin": allowOrigin, Vary: "Origin" } : {}),
+      },
+      JSON.stringify({ error: "Invalid cart items (missing/zero prices)" })
+    );
+    return;
+  }
 
   const jsonPayload = {
     description: String(payload?.description || "Checkout").trim(),

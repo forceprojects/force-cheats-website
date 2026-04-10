@@ -27,16 +27,25 @@
   ]);
 
   const parsePriceToCents = (price) => {
-    if (typeof price !== "string") return 0;
-    const normalized = price
-      .replace(/\s+/g, "")
-      .replace("€", "")
-      .replace("$", "")
-      .replace(",", ".")
-      .replace(/[^0-9.]/g, "");
-    const value = Number.parseFloat(normalized);
+    if (Number.isFinite(price)) return Math.round(Math.max(0, price) * 100);
+    const raw = String(price ?? "").trim();
+    if (!raw) return 0;
+
+    let s = raw.replace(/\s+/g, "").replace("€", "").replace("$", "");
+    const lastComma = s.lastIndexOf(",");
+    const lastDot = s.lastIndexOf(".");
+
+    if (lastComma >= 0 && lastDot >= 0) {
+      const decimalIsComma = lastComma > lastDot;
+      s = decimalIsComma ? s.replace(/\./g, "").replace(",", ".") : s.replace(/,/g, "");
+    } else if (lastComma >= 0) {
+      s = s.replace(",", ".");
+    }
+
+    s = s.replace(/[^0-9.]/g, "");
+    const value = Number.parseFloat(s);
     if (!Number.isFinite(value)) return 0;
-    return Math.round(value * 100);
+    return Math.round(Math.max(0, value) * 100);
   };
 
   const formatCents = (cents, currency = DEFAULT_CURRENCY) => {
@@ -355,9 +364,9 @@
     const base = String(baseUrl || "").trim();
     const id = encodeURIComponent(String(checkoutId || "").trim());
     if (!base || !id) return base;
-    if (base.endsWith("?=") || base.endsWith("&=") || base.endsWith("=")) return base + id;
-    if (base.includes("?")) return base + (base.endsWith("?") || base.endsWith("&") ? "=" : "&=") + id;
-    return base + "?=" + id;
+    if (base.endsWith("checkoutSessionId=")) return base + id;
+    if (base.includes("?")) return base + (base.endsWith("?") || base.endsWith("&") ? "" : "&") + "checkoutSessionId=" + id;
+    return base + "?checkoutSessionId=" + id;
   };
 
   const beginCheckout = async () => {
