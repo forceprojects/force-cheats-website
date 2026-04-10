@@ -1752,11 +1752,13 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
         };
 
         const updateFeaturesTechBar = (product) => {
-          const targets = [];
           const byId = document.getElementById('featuresTechBar');
-          if (byId) targets.push(byId);
           const legacy = document.querySelector('.description_product .features-tech');
-          if (legacy && legacy !== byId) targets.push(legacy);
+          const targets = legacy ? [legacy] : (byId ? [byId] : []);
+          if (legacy && byId) {
+            byId.style.display = 'none';
+            byId.innerHTML = '';
+          }
           if (!targets.length) return;
 
           const rawSecondaryBadges = Array.isArray(product?.secondaryBadges) ? product.secondaryBadges : [];
