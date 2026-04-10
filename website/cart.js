@@ -39,7 +39,10 @@
       const decimalIsComma = lastComma > lastDot;
       s = decimalIsComma ? s.replace(/\./g, "").replace(",", ".") : s.replace(/,/g, "");
     } else if (lastComma >= 0) {
-      s = s.replace(",", ".");
+      if (/^\d{1,3}(,\d{3})+$/.test(s)) s = s.replace(/,/g, "");
+      else s = s.replace(",", ".");
+    } else if (lastDot >= 0) {
+      if (/^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, "");
     }
 
     s = s.replace(/[^0-9.]/g, "");

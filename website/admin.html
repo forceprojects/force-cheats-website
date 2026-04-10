@@ -2060,6 +2060,7 @@ document.addEventListener('DOMContentLoaded', () => {
             statusType: 'success',
             statusPreset: '',
             badges: [],
+            secondaryBadges: [],
             guides: []
           });
           existing.add(key);
@@ -2072,6 +2073,11 @@ document.addEventListener('DOMContentLoaded', () => {
       payload.products.forEach((p) => {
         p.galleryImages = Array.isArray(p.galleryImages) ? p.galleryImages.slice(0, 3) : [];
         p.badges = Array.isArray(p.badges) ? p.badges.slice(0, 3) : [];
+        p.secondaryBadges = Array.isArray(p.secondaryBadges) ? p.secondaryBadges : [];
+        p.secondaryBadges = p.secondaryBadges
+          .map((b) => ({ icon: String(b?.icon || '').trim(), text: String(b?.text || b?.label || '').trim() }))
+          .filter((b) => b.text)
+          .slice(0, 4);
       });
     } catch (_) {}
     try {
@@ -2284,12 +2290,14 @@ document.addEventListener('DOMContentLoaded', () => {
         statusType: 'success',
         statusPreset: '',
         badges: [],
+        secondaryBadges: [],
         guides: []
       };
       storeConfig.products.push(product);
       scheduleAutoSave();
     }
     product.badges = Array.isArray(product.badges) ? product.badges : [];
+    product.secondaryBadges = Array.isArray(product.secondaryBadges) ? product.secondaryBadges : [];
     product.galleryImages = Array.isArray(product.galleryImages) ? product.galleryImages : [];
     product.variants = Array.isArray(product.variants) ? product.variants : [];
     product.techBadges = Array.isArray(product.techBadges) ? product.techBadges : [];
@@ -3158,6 +3166,114 @@ document.addEventListener('DOMContentLoaded', () => {
       box.appendChild(input);
       box.appendChild(rm);
       badgesWrap.appendChild(box);
+    });
+
+    const sepSecondaryBadges = document.createElement('div');
+    sepSecondaryBadges.style.borderTop = '1px solid rgba(255,255,255,0.06)';
+    sepSecondaryBadges.style.marginTop = '14px';
+    sepSecondaryBadges.style.marginBottom = '14px';
+    form.appendChild(sepSecondaryBadges);
+
+    const secondaryHeader = document.createElement('div');
+    secondaryHeader.style.display = 'flex';
+    secondaryHeader.style.justifyContent = 'space-between';
+    secondaryHeader.style.alignItems = 'center';
+    secondaryHeader.style.gap = '10px';
+    secondaryHeader.style.marginTop = '8px';
+    const sLabel = document.createElement('div');
+    sLabel.style.fontWeight = '900';
+    sLabel.textContent = 'Secondary Badges (max 4)';
+    const addSecondary = document.createElement('button');
+    addSecondary.type = 'button';
+    addSecondary.className = 'ipsButton ipsButton_small ipsButton_primary';
+    addSecondary.textContent = 'Add';
+    addSecondary.disabled = !isAdmin() || (Array.isArray(product.secondaryBadges) ? product.secondaryBadges.length : 0) >= 4;
+    addSecondary.addEventListener('click', () => {
+      product.secondaryBadges = Array.isArray(product.secondaryBadges) ? product.secondaryBadges : [];
+      if (product.secondaryBadges.length >= 4) return;
+      product.secondaryBadges.push({ icon: 'fa-solid fa-check', text: '' });
+      scheduleAutoSave();
+      showProductEditor(homeCard, s, defaults);
+    });
+    secondaryHeader.appendChild(sLabel);
+    secondaryHeader.appendChild(addSecondary);
+    form.appendChild(secondaryHeader);
+
+    const secondaryWrap = document.createElement('div');
+    secondaryWrap.style.display = 'flex';
+    secondaryWrap.style.flexDirection = 'column';
+    secondaryWrap.style.gap = '10px';
+    secondaryWrap.style.marginTop = '10px';
+    form.appendChild(secondaryWrap);
+
+    const secondaryIconOptions = [
+      { label: 'Desktop', value: 'fa-solid fa-desktop' },
+      { label: 'Lock', value: 'fa-solid fa-lock' },
+      { label: 'Layers', value: 'fa-solid fa-layer-group' },
+      { label: 'CPU', value: 'fa-solid fa-microchip' },
+      { label: 'Shield', value: 'fa-solid fa-shield-halved' },
+      { label: 'Check', value: 'fa-solid fa-check' },
+    ];
+
+    (Array.isArray(product.secondaryBadges) ? product.secondaryBadges.slice(0, 4) : []).forEach((b, idx) => {
+      const box = document.createElement('div');
+      box.className = 'ipsBox ipsPad_half';
+      box.style.background = 'rgba(255,255,255,.03)';
+      box.style.display = 'grid';
+      box.style.gridTemplateColumns = '180px 1fr auto';
+      box.style.gap = '10px';
+
+      const select = document.createElement('select');
+      select.className = 'ipsField_fullWidth';
+      select.style.height = '38px';
+      const currentIcon = String(b?.icon || 'fa-solid fa-check').trim();
+      const hasCurrent = secondaryIconOptions.some((o) => o.value === currentIcon);
+      const options = hasCurrent ? secondaryIconOptions : [{ label: currentIcon || 'Custom', value: currentIcon || 'fa-solid fa-check' }].concat(secondaryIconOptions);
+      select.innerHTML = options
+        .map((o) => '<option value="' + escapeHtml(o.value) + '">' + escapeHtml(o.label) + '</option>')
+        .join('');
+      select.value = currentIcon || 'fa-solid fa-check';
+      select.disabled = !isAdmin();
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'ipsField_fullWidth';
+      input.placeholder = 'Text';
+      input.value = String(b?.text || b?.label || '');
+      input.disabled = !isAdmin();
+
+      const sync = () => {
+        product.secondaryBadges[idx] = {
+          icon: String(select.value || '').trim(),
+          text: String(input.value || '').trim(),
+        };
+        scheduleAutoSave();
+        schedulePreview();
+      };
+      select.addEventListener('change', sync);
+      input.addEventListener('input', sync);
+
+      const rm = document.createElement('button');
+      rm.type = 'button';
+      rm.className = 'ipsButton ipsButton_small ipsButton_negative';
+      rm.innerHTML = "<i class='fa fa-trash' aria-hidden='true'></i>";
+      rm.style.height = '38px';
+      rm.style.width = '46px';
+      rm.style.padding = '0';
+      rm.style.display = 'flex';
+      rm.style.alignItems = 'center';
+      rm.style.justifyContent = 'center';
+      rm.disabled = !isAdmin();
+      rm.addEventListener('click', () => {
+        product.secondaryBadges.splice(idx, 1);
+        scheduleAutoSave();
+        showProductEditor(homeCard, s, defaults);
+      });
+
+      box.appendChild(select);
+      box.appendChild(input);
+      box.appendChild(rm);
+      secondaryWrap.appendChild(box);
     });
 
     const sepManage = document.createElement('div');
