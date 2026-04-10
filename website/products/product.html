@@ -1812,13 +1812,38 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
             const s = String(value || '').trim();
             if (!s) return '';
             if (!/^[a-z0-9\\s-]+$/i.test(s)) return '';
-            if (!/(^|\\s)fa-/.test(s)) return '';
             return s;
+          };
+
+          const normalizeIconClass = (value) => {
+            const s = sanitizeIconClass(value);
+            if (!s) return '';
+            const parts = s.split(/\s+/).filter(Boolean);
+            const uniq = [];
+            const seen = new Set();
+            for (const p of parts) {
+              if (!seen.has(p)) {
+                seen.add(p);
+                uniq.push(p);
+              }
+            }
+            const hasStyle =
+              uniq.includes('fa') ||
+              uniq.includes('fas') ||
+              uniq.includes('far') ||
+              uniq.includes('fal') ||
+              uniq.includes('fab') ||
+              uniq.includes('fad') ||
+              uniq.includes('fat') ||
+              uniq.some((x) => x.startsWith('fa-') && (x === 'fa-solid' || x === 'fa-regular' || x === 'fa-light' || x === 'fa-thin' || x === 'fa-duotone' || x === 'fa-brands' || x === 'fa-sharp' || x === 'fa-sharp-solid'));
+            if (!uniq.includes('fa')) uniq.unshift('fa');
+            if (!hasStyle) uniq.unshift('fa-solid');
+            return uniq.join(' ');
           };
 
           const primaryBadges = (rawSecondaryBadges.length ? rawSecondaryBadges : rawFeaturesBadges)
             .map((b) => {
-              const icon = sanitizeIconClass(b?.icon);
+              const icon = normalizeIconClass(b?.icon);
               const text = String(b?.text || b?.label || '').trim();
               return { icon, text };
             })
@@ -1828,7 +1853,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
           const renderBadgesHtml = (items) =>
             items
               .map((b) => {
-                const icon = b.icon || 'fa-solid fa-check';
+                const icon = normalizeIconClass(b.icon) || 'fa fa-solid fa-check';
                 return (
                   '<div class="features-tech-badge">' +
                   '<span class="features-icon"><i class="' +
@@ -1850,7 +1875,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
               .map((t) => {
                 return (
                   '<div class="features-tech-badge">' +
-                  '<span class="features-icon"><i class="fa-solid fa-check"></i></span> ' +
+                  '<span class="features-icon"><i class="fa fa-solid fa-check"></i></span> ' +
                   escapeHtml(t) +
                   '</div>'
                 );
