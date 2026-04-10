@@ -1808,7 +1808,9 @@ const handleMoneyMotionCheckout = async (req, res) => {
       const decimalIsComma = lastComma > lastDot;
       normalized = decimalIsComma ? raw.replace(/\./g, "").replace(",", ".") : raw.replace(/,/g, "");
     } else if (lastComma >= 0) {
-      normalized = raw.replace(",", ".");
+      normalized = /^\d{1,3}(,\d{3})+$/.test(raw) ? raw.replace(/,/g, "") : raw.replace(",", ".");
+    } else if (lastDot >= 0) {
+      normalized = /^\d{1,3}(\.\d{3})+$/.test(raw) ? raw.replace(/\./g, "") : raw;
     }
     normalized = normalized.replace(/[^0-9.]/g, "");
     const n = Number.parseFloat(normalized);
@@ -1924,18 +1926,83 @@ const handleMoneyMotionCheckout = async (req, res) => {
     lineItems,
   };
 
-  const body = JSON.stringify({ json: jsonPayload });
+  const upstreamHeaders = {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+    "x-api-key": apiKey,
+    "x-currency": currency,
+  };
+
+  const postUpstream = async (url, bodyObj) => {
+    return await httpsJson(url, { method: "POST", headers: upstreamHeaders, body: JSON.stringify(bodyObj) });
+  };
+
+  const looksLikeTrpcInvalidRequest = (up) => {
+    const code = up?.json?.error?.json?.code;
+    if (code === -32600) return true;
+    const code2 = up?.json?.error?.code;
+    if (code2 === -32600) return true;
+    const msg = extractErrorText(up?.json || up?.text || "");
+    return msg === "is missing" || /is missing/i.test(msg);
+  };
+
   let upstream = null;
+  let upstreamAttempt = "";
+  let upstreamUsedUrl = "";
   try {
-    upstream = await httpsJson(createUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "x-currency": currency,
-      },
-      body,
-    });
+    const proc = "checkoutSessions.createCheckoutSession";
+    const urlCandidates = (() => {
+      try {
+        const u = new URL(createUrl);
+        const list = [u.toString()];
+        if (!/\/trpc\//i.test(u.pathname)) {
+          const trpc = u.origin.replace(/\/+$/, "") + "/trpc/" + proc;
+          list.push(trpc);
+        }
+        return Array.from(new Set(list));
+      } catch (_) {
+        return [createUrl];
+      }
+    })();
+
+    const tryPost = async (url, bodyObj, attempt) => {
+      upstreamAttempt = attempt;
+      upstreamUsedUrl = url;
+      return await postUpstream(url, bodyObj);
+    };
+
+    const shouldTryNext = (up) => {
+      if (!up) return true;
+      if (up.status === 400) return looksLikeTrpcInvalidRequest(up);
+      if (up.status === 404 || up.status === 405) return true;
+      return false;
+    };
+
+    for (const baseUrl of urlCandidates) {
+      upstream = await tryPost(baseUrl, { json: jsonPayload }, "json");
+      if (!shouldTryNext(upstream)) break;
+
+      upstream = await tryPost(baseUrl, { input: jsonPayload }, "input");
+      if (!shouldTryNext(upstream)) break;
+
+      upstream = await tryPost(baseUrl, { json: jsonPayload, input: jsonPayload }, "json+input");
+      if (!shouldTryNext(upstream)) break;
+
+      upstream = await tryPost(baseUrl, { id: 0, json: jsonPayload }, "id0+json");
+      if (!shouldTryNext(upstream)) break;
+
+      let batchUrl = baseUrl;
+      try {
+        const u = new URL(baseUrl);
+        u.searchParams.set("batch", "1");
+        batchUrl = u.toString();
+      } catch (_) {}
+      upstream = await tryPost(batchUrl, { "0": { json: jsonPayload } }, "batch0_json");
+      if (!shouldTryNext(upstream)) break;
+
+      upstream = await tryPost(batchUrl, { "0": { input: jsonPayload } }, "batch0_input");
+      if (!shouldTryNext(upstream)) break;
+    }
   } catch (e) {
     send(
       res,
@@ -1962,6 +2029,8 @@ const handleMoneyMotionCheckout = async (req, res) => {
       JSON.stringify({
         error: `Upstream error (${upstream.status}): ${upstreamMsg}`,
         status: upstream.status,
+        attempt: upstreamAttempt || undefined,
+        url: upstreamUsedUrl || undefined,
         body: upstreamBody,
       })
     );
