@@ -1749,7 +1749,7 @@ const handleMoneyMotionCheckout = async (req, res) => {
   const authedEmail = userRes.ok ? String(userRes.user?.email || "").trim().toLowerCase() : "";
 
   const apiKey = String(process.env.MONEY_MOTION_API_KEY || "").trim();
-  const createUrl = String(process.env.MONEY_MOTION_CREATE_CHECKOUT_URL || "https://api.moneymotion.io/checkoutSessions.createCheckoutSession").trim();
+  const createUrl = String(process.env.MONEY_MOTION_CREATE_CHECKOUT_URL || "https://api.moneymotion.io/trpc/checkoutSessions.createCheckoutSession").trim();
   if (!apiKey) {
     send(
       res,
@@ -1945,8 +1945,14 @@ const handleMoneyMotionCheckout = async (req, res) => {
     "x-currency": currency,
   };
 
-  const postUpstream = async (url, bodyObj) => {
-    return await httpsJson(url, { method: "POST", headers: upstreamHeaders, body: JSON.stringify(bodyObj) });
+  const postUpstream = async (url, bodyObjOrNull) => {
+    const body = bodyObjOrNull ? JSON.stringify(bodyObjOrNull) : null;
+    return await httpsJson(url, { method: "POST", headers: upstreamHeaders, body });
+  };
+
+  const postUpstreamRaw = async (url, bodyStringOrNull) => {
+    const body = typeof bodyStringOrNull === "string" ? bodyStringOrNull : null;
+    return await httpsJson(url, { method: "POST", headers: upstreamHeaders, body });
   };
 
   const looksLikeTrpcInvalidRequest = (up) => {
@@ -1963,43 +1969,26 @@ const handleMoneyMotionCheckout = async (req, res) => {
   let upstreamUsedUrl = "";
   try {
     const proc = "checkoutSessions.createCheckoutSession";
-    const urlCandidates = (() => {
+    const trpcUrl = (() => {
       try {
         const u = new URL(createUrl);
-        const list = [u.toString()];
-        if (!/\/trpc\//i.test(u.pathname)) {
-          const trpc = u.origin.replace(/\/+$/, "") + "/trpc/" + proc;
-          list.push(trpc);
-        }
-        return Array.from(new Set(list));
+        if (/\/trpc\//i.test(u.pathname)) return u.toString();
+        return u.origin.replace(/\/+$/, "") + "/trpc/" + proc;
       } catch (_) {
-        return [createUrl];
+        return "https://api.moneymotion.io/trpc/" + proc;
       }
     })();
 
-    const tryPost = async (url, bodyObj, attempt) => {
+    const tryPost = async (url, bodyObjOrNull, attempt) => {
       upstreamAttempt = attempt;
       upstreamUsedUrl = url;
-      return await postUpstream(url, bodyObj);
+      return await postUpstream(url, bodyObjOrNull);
     };
 
-    const withBatch = (url) => {
-      try {
-        const u = new URL(url);
-        u.searchParams.set("batch", "1");
-        return u.toString();
-      } catch (_) {
-        return url;
-      }
-    };
-
-    const hasBatch = (url) => {
-      try {
-        const u = new URL(url);
-        return u.searchParams.get("batch") === "1";
-      } catch (_) {
-        return false;
-      }
+    const tryPostRaw = async (url, bodyStringOrNull, attempt) => {
+      upstreamAttempt = attempt;
+      upstreamUsedUrl = url;
+      return await postUpstreamRaw(url, bodyStringOrNull);
     };
 
     const shouldTryNext = (up) => {
@@ -2009,51 +1998,20 @@ const handleMoneyMotionCheckout = async (req, res) => {
       return false;
     };
 
-    for (const baseUrl of urlCandidates) {
-      const attempts = [];
-
-      if (!hasBatch(baseUrl)) {
-        attempts.push({ url: baseUrl, body: { json: jsonPayload }, label: "json" });
-        attempts.push({ url: baseUrl, body: { input: jsonPayload }, label: "input" });
-        attempts.push({ url: baseUrl, body: { json: jsonPayload, input: jsonPayload }, label: "json+input" });
-        attempts.push({ url: baseUrl, body: { id: 0, json: jsonPayload }, label: "id0+json" });
-        attempts.push({ url: baseUrl, body: { id: 0, input: jsonPayload }, label: "id0+input" });
-        attempts.push({
-          url: baseUrl,
-          body: { id: 0, jsonrpc: "2.0", method: proc, params: { input: jsonPayload } },
-          label: "jsonrpc_params_input",
-        });
-        attempts.push({
-          url: baseUrl,
-          body: { id: 0, jsonrpc: "2.0", method: proc, params: { json: jsonPayload } },
-          label: "jsonrpc_params_json",
-        });
+    const batchUrl = (() => {
+      try {
+        const u = new URL(trpcUrl);
+        u.searchParams.set("batch", "1");
+        u.searchParams.set("input", JSON.stringify({ 0: jsonPayload }));
+        return u.toString();
+      } catch (_) {
+        return trpcUrl;
       }
+    })();
 
-      const batchUrl = withBatch(baseUrl);
-      attempts.push({ url: batchUrl, body: { "0": { json: jsonPayload } }, label: "batch_obj0_json" });
-      attempts.push({ url: batchUrl, body: { "0": { input: jsonPayload } }, label: "batch_obj0_input" });
-      attempts.push({ url: batchUrl, body: [{ json: jsonPayload }], label: "batch_arr_json" });
-      attempts.push({ url: batchUrl, body: [{ id: 0, json: jsonPayload }], label: "batch_arr_id0_json" });
-      attempts.push({ url: batchUrl, body: [{ input: jsonPayload }], label: "batch_arr_input" });
-      attempts.push({ url: batchUrl, body: [{ id: 0, input: jsonPayload }], label: "batch_arr_id0_input" });
-      attempts.push({
-        url: batchUrl,
-        body: [{ id: 0, jsonrpc: "2.0", method: proc, params: { input: jsonPayload } }],
-        label: "batch_arr_jsonrpc_params_input",
-      });
-      attempts.push({
-        url: batchUrl,
-        body: [{ id: 0, jsonrpc: "2.0", method: proc, params: { json: jsonPayload } }],
-        label: "batch_arr_jsonrpc_params_json",
-      });
-
-      for (const a of attempts) {
-        upstream = await tryPost(a.url, a.body, a.label);
-        if (!shouldTryNext(upstream)) break;
-      }
-
-      if (!shouldTryNext(upstream)) break;
+    upstream = await tryPost(batchUrl, null, "trpc_batch_qs_input");
+    if (shouldTryNext(upstream)) {
+      upstream = await tryPostRaw(trpcUrl, JSON.stringify(jsonPayload), "trpc_post_body_raw");
     }
   } catch (e) {
     send(
@@ -2094,11 +2052,12 @@ const handleMoneyMotionCheckout = async (req, res) => {
   }
 
   const json = upstream.json;
+  const root = Array.isArray(json) ? json[0] : json;
   const checkoutSessionId =
-    (json && json.result && json.result.data && json.result.data.json && json.result.data.json.checkoutSessionId) ||
-    (json && json.result && json.result.data && json.result.data.checkoutSessionId) ||
-    (json && json.checkoutSessionId) ||
-    (json && json.data && json.data.checkoutSessionId) ||
+    (root && root.result && root.result.data && root.result.data.json && root.result.data.json.checkoutSessionId) ||
+    (root && root.result && root.result.data && root.result.data.checkoutSessionId) ||
+    (root && root.checkoutSessionId) ||
+    (root && root.data && root.data.checkoutSessionId) ||
     "";
 
   const checkoutBase = String(process.env.MONEY_MOTION_CHECKOUT_BASE_URL || "https://moneymotion.io/checkout/").trim();
@@ -2108,13 +2067,13 @@ const handleMoneyMotionCheckout = async (req, res) => {
       : "";
 
   const checkoutUrl =
-    (json && typeof json.checkoutUrl === "string" && json.checkoutUrl) ||
-    (json && typeof json.checkout_url === "string" && json.checkout_url) ||
-    (json && typeof json.url === "string" && json.url) ||
-    (json && typeof json.session_url === "string" && json.session_url) ||
-    (json && typeof json.payment_url === "string" && json.payment_url) ||
+    (root && typeof root.checkoutUrl === "string" && root.checkoutUrl) ||
+    (root && typeof root.checkout_url === "string" && root.checkout_url) ||
+    (root && typeof root.url === "string" && root.url) ||
+    (root && typeof root.session_url === "string" && root.session_url) ||
+    (root && typeof root.payment_url === "string" && root.payment_url) ||
     checkoutUrlFromId ||
-    extractFirstUrl(json);
+    extractFirstUrl(root);
 
   if (!checkoutUrl) {
     send(
@@ -2393,6 +2352,20 @@ const handleRequest = async (req, res) => {
         return;
       }
       await handleMoneyMotionCheckout(req, res);
+      return;
+    }
+    if (u.pathname === "/api/version") {
+      if (req.method !== "GET" && req.method !== "HEAD") {
+        send(res, 405, { "Content-Type": "text/plain; charset=utf-8" }, "Method Not Allowed");
+        return;
+      }
+      const payload = JSON.stringify({ ok: true, serverVersion: STATIC_BUST_VERSION });
+      send(
+        res,
+        200,
+        { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" },
+        req.method === "HEAD" ? "" : payload
+      );
       return;
     }
 
