@@ -1752,9 +1752,14 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
         };
 
         const updateFeaturesTechBar = (product) => {
-          const bar = document.getElementById('featuresTechBar');
-          if (!bar) return;
+          const targets = [];
+          const byId = document.getElementById('featuresTechBar');
+          if (byId) targets.push(byId);
+          const legacy = document.querySelector('.description_product .features-tech');
+          if (legacy && legacy !== byId) targets.push(legacy);
+          if (!targets.length) return;
 
+          const rawSecondaryBadges = Array.isArray(product?.secondaryBadges) ? product.secondaryBadges : [];
           const rawFeaturesBadges = Array.isArray(product?.featuresBadges) ? product.featuresBadges : [];
           const rawTechBadges = Array.isArray(product?.techBadges) ? product.techBadges : [];
 
@@ -1766,7 +1771,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
             return s;
           };
 
-          const featuresBadges = rawFeaturesBadges
+          const primaryBadges = (rawSecondaryBadges.length ? rawSecondaryBadges : rawFeaturesBadges)
             .map((b) => {
               const icon = sanitizeIconClass(b?.icon);
               const text = String(b?.text || b?.label || '').trim();
@@ -1775,9 +1780,8 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
             .filter((b) => b.text)
             .slice(0, 4);
 
-          if (featuresBadges.length) {
-            bar.style.display = '';
-            bar.innerHTML = featuresBadges
+          const renderBadgesHtml = (items) =>
+            items
               .map((b) => {
                 const icon = b.icon || 'fa-solid fa-check';
                 return (
@@ -1790,17 +1794,14 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                 );
               })
               .join('');
-            return;
-          }
 
           const techBadges = rawTechBadges
             .map((t) => String(t || '').trim())
             .filter(Boolean)
             .slice(0, 4);
 
-          if (techBadges.length) {
-            bar.style.display = '';
-            bar.innerHTML = techBadges
+          const renderTechHtml = (items) =>
+            items
               .map((t) => {
                 return (
                   '<div class="features-tech-badge">' +
@@ -1810,11 +1811,27 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                 );
               })
               .join('');
+
+          if (primaryBadges.length) {
+            for (const bar of targets) {
+              bar.style.display = '';
+              bar.innerHTML = renderBadgesHtml(primaryBadges);
+            }
             return;
           }
 
-          bar.style.display = 'none';
-          bar.innerHTML = '';
+          if (techBadges.length) {
+            for (const bar of targets) {
+              bar.style.display = '';
+              bar.innerHTML = renderTechHtml(techBadges);
+            }
+            return;
+          }
+
+          for (const bar of targets) {
+            bar.style.display = 'none';
+            bar.innerHTML = '';
+          }
         };
 
         const updateHeaderText = (name) => {
