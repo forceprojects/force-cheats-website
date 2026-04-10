@@ -1898,7 +1898,15 @@ const handleMoneyMotionCheckout = async (req, res) => {
       const desc = String(i?.description || i?.variantName || "").trim();
       const qty = Number.isFinite(i?.quantity) ? Math.max(1, Math.floor(i.quantity)) : 1;
       const cents = toCents(i?.pricePerItemInCents ?? i?.unitAmount ?? i?.unitAmountInCents ?? i?.priceCents ?? 0);
-      return { name, description: desc || undefined, pricePerItemInCents: cents, quantity: qty };
+      return {
+        name,
+        description: desc || undefined,
+        quantity: qty,
+        pricePerItemInCents: cents,
+        unitAmountInCents: cents,
+        unitAmount: cents,
+        priceCents: cents,
+      };
     })
     .filter((x) => x.pricePerItemInCents > 0 && x.quantity > 0);
 
@@ -1917,6 +1925,9 @@ const handleMoneyMotionCheckout = async (req, res) => {
 
   const jsonPayload = {
     description: String(payload?.description || "Checkout").trim(),
+    currency,
+    currencyCode: currency,
+    currency_code: currency,
     urls: {
       success: withCheckoutIdSuffix(successWithToken),
       cancel: withCheckoutIdSuffix(cancelUrl || `${expectedHttp || "http://localhost:8000"}/`),
@@ -2007,6 +2018,16 @@ const handleMoneyMotionCheckout = async (req, res) => {
         attempts.push({ url: baseUrl, body: { json: jsonPayload, input: jsonPayload }, label: "json+input" });
         attempts.push({ url: baseUrl, body: { id: 0, json: jsonPayload }, label: "id0+json" });
         attempts.push({ url: baseUrl, body: { id: 0, input: jsonPayload }, label: "id0+input" });
+        attempts.push({
+          url: baseUrl,
+          body: { id: 0, jsonrpc: "2.0", method: proc, params: { input: jsonPayload } },
+          label: "jsonrpc_params_input",
+        });
+        attempts.push({
+          url: baseUrl,
+          body: { id: 0, jsonrpc: "2.0", method: proc, params: { json: jsonPayload } },
+          label: "jsonrpc_params_json",
+        });
       }
 
       const batchUrl = withBatch(baseUrl);
@@ -2016,6 +2037,16 @@ const handleMoneyMotionCheckout = async (req, res) => {
       attempts.push({ url: batchUrl, body: [{ id: 0, json: jsonPayload }], label: "batch_arr_id0_json" });
       attempts.push({ url: batchUrl, body: [{ input: jsonPayload }], label: "batch_arr_input" });
       attempts.push({ url: batchUrl, body: [{ id: 0, input: jsonPayload }], label: "batch_arr_id0_input" });
+      attempts.push({
+        url: batchUrl,
+        body: [{ id: 0, jsonrpc: "2.0", method: proc, params: { input: jsonPayload } }],
+        label: "batch_arr_jsonrpc_params_input",
+      });
+      attempts.push({
+        url: batchUrl,
+        body: [{ id: 0, jsonrpc: "2.0", method: proc, params: { json: jsonPayload } }],
+        label: "batch_arr_jsonrpc_params_json",
+      });
 
       for (const a of attempts) {
         upstream = await tryPost(a.url, a.body, a.label);
@@ -2040,6 +2071,8 @@ const handleMoneyMotionCheckout = async (req, res) => {
   if (upstream.status < 200 || upstream.status >= 300) {
     const upstreamBody = upstream.json || upstream.text;
     const upstreamMsg = extractErrorText(upstreamBody) || "Upstream error";
+    const detailSuffix =
+      upstreamAttempt || upstreamUsedUrl ? ` [attempt=${upstreamAttempt || "?"} url=${upstreamUsedUrl || "?"}]` : "";
     send(
       res,
       502,
@@ -2048,11 +2081,12 @@ const handleMoneyMotionCheckout = async (req, res) => {
         ...(allowOrigin ? { "Access-Control-Allow-Origin": allowOrigin, Vary: "Origin" } : {}),
       },
       JSON.stringify({
-        error: `Upstream error (${upstream.status}): ${upstreamMsg}`,
+        error: `Upstream error (${upstream.status}): ${upstreamMsg}${detailSuffix}`,
         status: upstream.status,
         serverVersion: STATIC_BUST_VERSION,
         attempt: upstreamAttempt || undefined,
         url: upstreamUsedUrl || undefined,
+        upstreamHeaders: upstream.headers || undefined,
         body: upstreamBody,
       })
     );

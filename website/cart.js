@@ -338,6 +338,16 @@
           if (typeof body === "string" && body.trim()) details = body.trim();
           else if (body && typeof body === "object") details = JSON.stringify(body);
         }
+        if (json && typeof json === "object") {
+          const metaBits = [];
+          const attempt = typeof json.attempt === "string" ? json.attempt.trim() : "";
+          const url = typeof json.url === "string" ? json.url.trim() : "";
+          const ver = typeof json.serverVersion === "string" ? json.serverVersion.trim() : "";
+          if (attempt) metaBits.push(`attempt=${attempt}`);
+          if (url) metaBits.push(`url=${url}`);
+          if (ver) metaBits.push(`serverVersion=${ver}`);
+          if (metaBits.length) details = (details ? details + "\n" : "") + metaBits.join("\n");
+        }
       } catch (_) {}
       throw new Error(details ? `${base}\n${details}` : base);
     }
